@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -95,10 +95,10 @@ tr.client td{background:var(--soft);font-weight:700}
       <span>Timetracker</span>
     </span>
     <nav>
-      <button data-tab="entry" class="active">Saisie</button>
-      <button data-tab="report">Rapports</button>
-      <button data-tab="manage">Clients &amp; projets</button>
-      <button data-tab="settings">Réglages</button>
+      <button data-tab="entry" class="active">Log time</button>
+      <button data-tab="report">Reports</button>
+      <button data-tab="manage">Clients &amp; projects</button>
+      <button data-tab="settings">Settings</button>
     </nav>
     <span class="sync" id="sync"></span>
   </div>
@@ -108,7 +108,7 @@ tr.client td{background:var(--soft);font-weight:700}
   <!-- SAISIE -->
   <section id="tab-entry" class="active">
     <form class="card" id="entry-form" autocomplete="off">
-      <h2 id="form-title">Nouvelle prestation</h2>
+      <h2 id="form-title">New entry</h2>
       <div class="grid entry-grid">
         <div class="a-date">
           <label for="f-date">Date</label>
@@ -118,20 +118,20 @@ tr.client td{background:var(--soft);font-weight:700}
           <label for="f-client">Client</label>
           <div class="with-btn">
             <select id="f-client" required></select>
-            <button type="button" class="btn ghost" id="quick-client" title="Nouveau client">+</button>
+            <button type="button" class="btn ghost" id="quick-client" title="New client">+</button>
           </div>
         </div>
         <div class="a-project">
-          <label for="f-project">Projet</label>
+          <label for="f-project">Project</label>
           <div class="with-btn">
             <select id="f-project" required></select>
-            <button type="button" class="btn ghost" id="quick-project" title="Nouveau projet">+</button>
+            <button type="button" class="btn ghost" id="quick-project" title="New project">+</button>
           </div>
           <div id="f-budget"></div>
         </div>
         <div class="a-dur">
-          <label for="f-dur">Temps passé (min. 0:30)</label>
-          <input id="f-dur" placeholder="1:30 · 1h30 · 1,5 · 90m" inputmode="decimal">
+          <label for="f-dur">Time spent (min. 0:30)</label>
+          <input id="f-dur" placeholder="1:30 · 1h30 · 1.5 · 90m" inputmode="decimal">
           <div class="chips">
             <button type="button" data-dur="30">0:30</button>
             <button type="button" data-dur="60">1:00</button>
@@ -143,23 +143,23 @@ tr.client td{background:var(--soft);font-weight:700}
           <div class="hint" id="f-dur-preview"></div>
         </div>
         <div class="a-desc">
-          <label for="f-desc">Description de la tâche</label>
-          <textarea id="f-desc" required placeholder="Ex. Configuration du tag Meta CAPI dans sGTM"></textarea>
+          <label for="f-desc">Task description</label>
+          <textarea id="f-desc" required placeholder="e.g. Meta CAPI tag setup in sGTM"></textarea>
         </div>
       </div>
       <div class="row" style="margin-top:12px">
-        <button class="btn" type="submit" id="f-submit">Enregistrer</button>
-        <button class="btn ghost" type="button" id="f-cancel" hidden>Annuler la modification</button>
+        <button class="btn" type="submit" id="f-submit">Save</button>
+        <button class="btn ghost" type="button" id="f-cancel" hidden>Cancel edit</button>
       </div>
     </form>
 
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">Dernières prestations</h2>
+        <h2 style="margin:0">Recent entries</h2>
         <select id="list-range" style="width:auto">
-          <option value="7">7 derniers jours</option>
-          <option value="31" selected>31 derniers jours</option>
-          <option value="all">Tout</option>
+          <option value="7">Last 7 days</option>
+          <option value="31" selected>Last 31 days</option>
+          <option value="all">All</option>
         </select>
       </div>
       <div id="entry-list"></div>
@@ -169,45 +169,45 @@ tr.client td{background:var(--soft);font-weight:700}
   <!-- RAPPORTS -->
   <section id="tab-report">
     <div class="card noprint">
-      <h2>Filtres</h2>
+      <h2>Filters</h2>
       <div class="grid">
         <div>
-          <label for="r-period">Période</label>
+          <label for="r-period">Period</label>
           <select id="r-period">
-            <option value="week">Cette semaine</option>
-            <option value="month" selected>Ce mois-ci</option>
-            <option value="lastmonth">Mois précédent</option>
-            <option value="year">Cette année</option>
-            <option value="all">Tout</option>
-            <option value="custom">Personnalisée…</option>
+            <option value="week">This week</option>
+            <option value="month" selected>This month</option>
+            <option value="lastmonth">Last month</option>
+            <option value="year">This year</option>
+            <option value="all">All</option>
+            <option value="custom">Custom…</option>
           </select>
         </div>
-        <div class="custom-range"><label for="r-from">Du</label><input type="date" id="r-from"></div>
-        <div class="custom-range"><label for="r-to">Au</label><input type="date" id="r-to"></div>
+        <div class="custom-range"><label for="r-from">From</label><input type="date" id="r-from"></div>
+        <div class="custom-range"><label for="r-to">To</label><input type="date" id="r-to"></div>
         <div><label for="r-client">Client</label><select id="r-client"></select></div>
-        <div><label for="r-project">Projet</label><select id="r-project"></select></div>
+        <div><label for="r-project">Project</label><select id="r-project"></select></div>
       </div>
       <div class="row" style="margin-top:12px">
-        <button class="btn ghost" id="r-csv">Exporter CSV</button>
-        <button class="btn ghost" id="r-print">Imprimer</button>
+        <button class="btn ghost" id="r-csv">Export CSV</button>
+        <button class="btn ghost" id="r-print">Print</button>
       </div>
     </div>
-    <div class="print-head"><span id="print-logo"></span><span>Relevé de prestations</span></div>
+    <div class="print-head"><span id="print-logo"></span><span>Timesheet report</span></div>
     <div class="print-title" id="r-print-title"></div>
-    <div class="card"><h2>Synthèse par projet</h2><div id="r-summary"></div></div>
-    <div class="card"><h2>Détail</h2><div id="r-detail"></div></div>
+    <div class="card"><h2>Summary by project</h2><div id="r-summary"></div></div>
+    <div class="card"><h2>Details</h2><div id="r-detail"></div></div>
   </section>
 
   <!-- CLIENTS & PROJETS -->
   <section id="tab-manage">
     <div class="card">
-      <h2>Ajouter un client</h2>
+      <h2>Add a client</h2>
       <form class="row" id="add-client-form">
-        <input id="new-client" placeholder="Nom du client" style="flex:1;min-width:200px" required>
-        <button class="btn" type="submit">Ajouter</button>
+        <input id="new-client" placeholder="Client name" style="flex:1;min-width:200px" required>
+        <button class="btn" type="submit">Add</button>
       </form>
       <label class="row" style="margin-top:12px;font-weight:400;color:var(--ink)">
-        <input type="checkbox" id="show-archived" style="width:auto"> Afficher les éléments archivés
+        <input type="checkbox" id="show-archived" style="width:auto"> Show archived items
       </label>
     </div>
     <div id="manage-list"></div>
@@ -216,35 +216,35 @@ tr.client td{background:var(--soft);font-weight:700}
   <!-- RÉGLAGES -->
   <section id="tab-settings">
     <div class="card">
-      <h2>Stockage des données</h2>
+      <h2>Data storage</h2>
       <div class="grid">
         <div class="full">
           <label for="s-mode">Mode</label>
           <select id="s-mode">
-            <option value="local">Local (ce navigateur uniquement)</option>
+            <option value="local">Local (this browser only)</option>
             <option value="sheets">Google Sheets (via Apps Script)</option>
           </select>
-          <div class="hint">En mode local, les données restent dans ce navigateur : pense à exporter une sauvegarde JSON régulièrement. Le mode Google Sheets synchronise tous tes appareils.</div>
+          <div class="hint">In local mode, data stays in this browser: export a JSON backup regularly. Google Sheets mode syncs all your devices.</div>
         </div>
-        <div class="full sheets-only"><label for="s-url">URL de l'application web Apps Script</label><input id="s-url" placeholder="https://script.google.com/macros/s/…/exec"></div>
-        <div class="full sheets-only"><label for="s-token">Jeton d'accès (API_TOKEN)</label><input id="s-token" type="password"></div>
+        <div class="full sheets-only"><label for="s-url">Apps Script web app URL</label><input id="s-url" placeholder="https://script.google.com/macros/s/…/exec"></div>
+        <div class="full sheets-only"><label for="s-token">Access token (API_TOKEN)</label><input id="s-token" type="password"></div>
       </div>
       <div class="row" style="margin-top:12px">
-        <button class="btn" id="s-save">Enregistrer les réglages</button>
-        <button class="btn ghost sheets-only" id="s-test">Tester la connexion</button>
-        <button class="btn ghost sheets-only" id="s-pull">Recharger depuis le Sheet</button>
-        <button class="btn ghost sheets-only" id="s-push">Envoyer les données locales vers le Sheet</button>
+        <button class="btn" id="s-save">Save settings</button>
+        <button class="btn ghost sheets-only" id="s-test">Test connection</button>
+        <button class="btn ghost sheets-only" id="s-pull">Reload from Sheet</button>
+        <button class="btn ghost sheets-only" id="s-push">Push local data to Sheet</button>
       </div>
     </div>
     <div class="card">
-      <h2>Sauvegarde</h2>
+      <h2>Backup</h2>
       <div class="row">
-        <button class="btn ghost" id="s-export">Exporter (JSON)</button>
-        <label class="btn ghost" style="margin:0;color:var(--ink);font-size:14px">Importer (JSON)
+        <button class="btn ghost" id="s-export">Export (JSON)</button>
+        <label class="btn ghost" style="margin:0;color:var(--ink);font-size:14px">Import (JSON)
           <input type="file" id="s-import" accept="application/json,.json" hidden>
         </label>
       </div>
-      <div class="hint">L'import remplace toutes les données actuelles.</div>
+      <div class="hint">Importing replaces all current data.</div>
     </div>
   </section>
 </main>
@@ -264,10 +264,10 @@ const today = () => isoDate(new Date());
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const byName = (a, b) => a.name.localeCompare(b.name, 'fr', {sensitivity: 'base'});
 const fmt = min => { const m = Math.abs(Math.round(min || 0)); return `${min < 0 ? '-' : ''}${Math.floor(m/60)}:${pad(m%60)}`; };
-const fmtDec = min => (Math.round(min / 60 * 100) / 100).toString().replace('.', ',');
-const fmtDay = iso => new Date(iso + 'T12:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+const fmtDec = min => (Math.round(min / 60 * 100) / 100).toString();
+const fmtDay = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
 
-/** Accepte : 1:30 · 1h30 · 1h · 1,5 · 1.5 · 90m · 90min */
+/** Accepts: 1:30 · 1h30 · 1h · 1,5 · 1.5 · 90m · 90min */
 function parseDuration(s) {
   s = String(s || '').trim().toLowerCase().replace(',', '.').replace(/\s+/g, '');
   if (!s) return null;
@@ -314,11 +314,11 @@ const usedMinutes = (pid, excludeId) => db.entries.filter(e => e.projectId === p
 async function api(payload) {
   const r = await fetch(cfg.url, {
     method: 'POST',
-    headers: {'Content-Type': 'text/plain;charset=utf-8'}, // évite le preflight CORS
+    headers: {'Content-Type': 'text/plain;charset=utf-8'}, // avoids CORS preflight
     body: JSON.stringify({...payload, token: cfg.token})
   });
   const j = await r.json();
-  if (!j.ok) throw new Error(j.error || 'Erreur inconnue');
+  if (!j.ok) throw new Error(j.error || 'Unknown error');
   return j;
 }
 
@@ -343,23 +343,23 @@ async function remoteLoad(silent = false) {
   try {
     setSync('busy');
     await flush();
-    if (queue.length) return; // ne pas écraser des modifs non envoyées
+    if (queue.length) return; // don't overwrite unsent changes
     const j = await api({action: 'all'});
     db = normalize(j.data); persist(); renderAll();
     setSync('ok');
-    if (!silent) toast('Données rechargées depuis le Sheet');
+    if (!silent) toast('Data reloaded from Sheet');
   } catch (e) {
     setSync('error', e.message);
-    if (!silent) toast('Connexion impossible : ' + e.message, true);
+    if (!silent) toast('Connection failed: ' + e.message, true);
   }
 }
 
 function setSync(status, msg = '') {
   syncState = {status, msg};
   const el = $('#sync');
-  if (cfg.mode === 'local') { el.textContent = 'Stockage local'; el.className = 'sync'; return; }
-  const pending = queue.length ? ` · ${queue.length} en attente` : '';
-  const label = {ok: 'synchronisé', busy: 'synchronisation…', error: 'erreur de synchro'}[status];
+  if (cfg.mode === 'local') { el.textContent = 'Local storage'; el.className = 'sync'; return; }
+  const pending = queue.length ? ` · ${queue.length} pending` : '';
+  const label = {ok: 'synced', busy: 'syncing…', error: 'sync error'}[status];
   el.textContent = `Google Sheets · ${label}${pending}`;
   el.title = msg;
   el.className = 'sync' + (status === 'error' ? ' bad' : '');
@@ -383,26 +383,26 @@ function mutate(action, table, payload) {
 /* ---------- Saisie ---------- */
 function fillClientSelect(sel, {withAll = false, includeArchived = false, selected = ''} = {}) {
   const list = db.clients.filter(c => includeArchived || !c.archived || c.id === selected).sort(byName);
-  sel.innerHTML = (withAll ? '<option value="">Tous les clients</option>' : '<option value="">— Choisir un client —</option>') +
-    list.map(c => `<option value="${c.id}">${esc(c.name)}${c.archived ? ' (archivé)' : ''}</option>`).join('');
+  sel.innerHTML = (withAll ? '<option value="">All clients</option>' : '<option value="">— Select a client —</option>') +
+    list.map(c => `<option value="${c.id}">${esc(c.name)}${c.archived ? ' (archived)' : ''}</option>`).join('');
   sel.value = list.some(c => c.id === selected) ? selected : '';
 }
 function fillProjectSelect(sel, clientId, {withAll = false, includeArchived = false, selected = ''} = {}) {
   const list = db.projects.filter(p => (!clientId || p.clientId === clientId) && (includeArchived || !p.archived || p.id === selected)).sort(byName);
-  const ph = withAll ? 'Tous les projets' : (clientId ? '— Choisir un projet —' : '— Choisis d\'abord un client —');
+  const ph = withAll ? 'All projects' : (clientId ? '— Select a project —' : '— Select a client first —');
   sel.innerHTML = `<option value="">${ph}</option>` + list.map(p =>
-    `<option value="${p.id}">${esc(p.name)}${!clientId ? ' — ' + esc(getClient(p.clientId)?.name) : ''}${p.archived ? ' (archivé)' : ''}</option>`).join('');
+    `<option value="${p.id}">${esc(p.name)}${!clientId ? ' — ' + esc(getClient(p.clientId)?.name) : ''}${p.archived ? ' (archived)' : ''}</option>`).join('');
   sel.value = list.some(p => p.id === selected) ? selected : (list.length === 1 && !withAll ? list[0].id : '');
 }
 
 function budgetHtml(p, extra = 0, excludeId = null) {
   if (!p) return '';
-  if (!p.soldMinutes) return '<div class="hint">Pas de temps vendu à l\'avance (en régie).</div>';
+  if (!p.soldMinutes) return '<div class="hint">No pre-sold time (time &amp; materials).</div>';
   const used = usedMinutes(p.id, excludeId) + extra;
   const over = used > p.soldMinutes;
   const pct = Math.min(100, used / p.soldMinutes * 100);
-  return `<div class="hint">Vendu ${fmt(p.soldMinutes)} · consommé ${fmt(used)} · ` +
-    `<span class="${over ? 'err' : ''}">${over ? 'dépassement ' + fmt(used - p.soldMinutes) : 'reste ' + fmt(p.soldMinutes - used)}</span></div>` +
+  return `<div class="hint">Sold ${fmt(p.soldMinutes)} · used ${fmt(used)} · ` +
+    `<span class="${over ? 'err' : ''}">${over ? 'over by ' + fmt(used - p.soldMinutes) : 'remaining ' + fmt(p.soldMinutes - used)}</span></div>` +
     `<div class="progress ${over ? 'over' : ''}"><div style="width:${pct}%"></div></div>`;
 }
 
@@ -412,8 +412,8 @@ function refreshFormHints() {
   const min = parseDuration(raw);
   const prev = $('#f-dur-preview');
   if (!raw) prev.innerHTML = '';
-  else if (min == null) prev.innerHTML = '<span class="err">Format non reconnu</span>';
-  else if (min < MIN_MINUTES) prev.innerHTML = `<span class="err">= ${fmt(min)} · minimum 0:30</span>`;
+  else if (min == null) prev.innerHTML = '<span class="err">Unrecognised format</span>';
+  else if (min < MIN_MINUTES) prev.innerHTML = `<span class="err">= ${fmt(min)} · minimum is 0:30</span>`;
   else prev.innerHTML = `= ${fmt(min)} (${fmtDec(min)} h)`;
   $('#f-budget').innerHTML = budgetHtml(p, (min && min >= MIN_MINUTES) ? min : 0, editingId);
 }
@@ -436,8 +436,8 @@ function startEdit(id) {
   fillProjectSelect($('#f-project'), e.clientId, {selected: e.projectId});
   $('#f-desc').value = e.description;
   $('#f-dur').value = fmt(e.minutes);
-  $('#form-title').textContent = 'Modifier la prestation';
-  $('#f-submit').textContent = 'Mettre à jour';
+  $('#form-title').textContent = 'Edit entry';
+  $('#f-submit').textContent = 'Update';
   $('#f-cancel').hidden = false;
   $('#entry-form').classList.add('editing');
   refreshFormHints();
@@ -445,8 +445,8 @@ function startEdit(id) {
 }
 function stopEdit() {
   editingId = null;
-  $('#form-title').textContent = 'Nouvelle prestation';
-  $('#f-submit').textContent = 'Enregistrer';
+  $('#form-title').textContent = 'New entry';
+  $('#f-submit').textContent = 'Save';
   $('#f-cancel').hidden = true;
   $('#entry-form').classList.remove('editing');
   $('#f-desc').value = ''; $('#f-dur').value = '';
@@ -458,16 +458,16 @@ function saveEntry(ev) {
   const clientId = $('#f-client').value, projectId = $('#f-project').value;
   const description = $('#f-desc').value.trim(), date = $('#f-date').value;
   const minutes = parseDuration($('#f-dur').value);
-  if (!date) return toast('Indique une date', true);
-  if (!clientId) return toast('Choisis un client', true);
-  if (!projectId) return toast('Choisis un projet', true);
-  if (!description) return toast('Ajoute une description', true);
-  if (minutes == null) return toast('Durée non reconnue (ex. 1:30)', true);
-  if (minutes < MIN_MINUTES) return toast('Durée minimum : 0:30', true);
+  if (!date) return toast('Enter a date', true);
+  if (!clientId) return toast('Select a client', true);
+  if (!projectId) return toast('Select a project', true);
+  if (!description) return toast('Add a description', true);
+  if (minutes == null) return toast('Unrecognised duration (e.g. 1:30)', true);
+  if (minutes < MIN_MINUTES) return toast('Minimum duration: 0:30', true);
   const old = editingId && db.entries.find(e => e.id === editingId);
   mutate('upsert', 'entries', {id: editingId || uid(), date, clientId, projectId, description, minutes, createdAt: old?.createdAt || new Date().toISOString()});
   localStorage.setItem(LS_LAST, JSON.stringify({clientId, projectId}));
-  toast(old ? 'Prestation mise à jour' : `Enregistré : ${fmt(minutes)}`);
+  toast(old ? 'Entry updated' : `Saved: ${fmt(minutes)}`);
   stopEdit(); renderAll();
   $('#f-desc').focus();
 }
@@ -478,7 +478,7 @@ function renderEntryList() {
   if (range !== 'all') { const d = new Date(); d.setDate(d.getDate() - Number(range) + 1); from = isoDate(d); }
   const list = db.entries.filter(e => e.date >= from)
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-  if (!list.length) { $('#entry-list').innerHTML = '<p class="muted">Aucune prestation sur cette période.</p>'; return; }
+  if (!list.length) { $('#entry-list').innerHTML = '<p class="muted">No entries in this period.</p>'; return; }
   const byDay = {};
   list.forEach(e => (byDay[e.date] ||= []).push(e));
   $('#entry-list').innerHTML = Object.entries(byDay).map(([day, items]) => `
@@ -491,8 +491,8 @@ function renderEntryList() {
         </div>
         <div class="dur">${fmt(e.minutes)}</div>
         <div class="row noprint">
-          <button class="btn ghost small" data-act="edit-entry" data-id="${e.id}">Modifier</button>
-          <button class="btn ghost small danger" data-act="del-entry" data-id="${e.id}">Suppr.</button>
+          <button class="btn ghost small" data-act="edit-entry" data-id="${e.id}">Edit</button>
+          <button class="btn ghost small danger" data-act="del-entry" data-id="${e.id}">Delete</button>
         </div>
       </div>`).join('')}`).join('');
 }
@@ -524,16 +524,16 @@ function renderReport() {
   const list = reportEntries();
   const [from, to] = periodRange();
   const periodLabel = $('#r-period').selectedOptions[0].text + (from > '0000' ? ` (${from} → ${to})` : '');
-  $('#r-print-title').textContent = `${rc.value ? getClient(rc.value)?.name : 'tous clients'} — ${periodLabel}`;
+  $('#r-print-title').textContent = `${rc.value ? getClient(rc.value)?.name : 'all clients'} — ${periodLabel}`;
 
-  // Synthèse
+  // Summary
   const groups = {};
   list.forEach(e => { ((groups[e.clientId] ||= {})[e.projectId] ||= 0); groups[e.clientId][e.projectId] += e.minutes; });
   const total = list.reduce((a, e) => a + e.minutes, 0);
   const clientIds = Object.keys(groups).sort((a, b) => (getClient(a)?.name || '').localeCompare(getClient(b)?.name || '', 'fr'));
-  $('#r-summary').innerHTML = !list.length ? '<p class="muted">Aucune prestation pour ces filtres.</p>' : `
+  $('#r-summary').innerHTML = !list.length ? '<p class="muted">No entries for these filters.</p>' : `
     <table>
-      <thead><tr><th>Client / projet</th><th class="num">Période</th><th class="num">Heures déc.</th><th class="num">Vendu</th><th class="num">Consommé (total)</th><th class="num">Reste</th></tr></thead>
+      <thead><tr><th>Client / project</th><th class="num">Period</th><th class="num">Decimal hrs</th><th class="num">Sold</th><th class="num">Used (all time)</th><th class="num">Remaining</th></tr></thead>
       <tbody>
       ${clientIds.map(cid => {
         const projs = groups[cid], sub = Object.values(projs).reduce((a, b) => a + b, 0);
@@ -550,10 +550,10 @@ function renderReport() {
       </tbody>
     </table>`;
 
-  // Détail
+  // Details
   $('#r-detail').innerHTML = !list.length ? '<p class="muted">—</p>' : `
     <table>
-      <thead><tr><th>Date</th><th>Client</th><th>Projet</th><th>Description</th><th class="num">Durée</th></tr></thead>
+      <thead><tr><th>Date</th><th>Client</th><th>Project</th><th>Description</th><th class="num">Duration</th></tr></thead>
       <tbody>${list.map(e => `<tr><td style="white-space:nowrap">${e.date}</td><td>${esc(getClient(e.clientId)?.name)}</td><td>${esc(getProject(e.projectId)?.name)}</td><td>${esc(e.description)}</td><td class="num">${fmt(e.minutes)}</td></tr>`).join('')}
       <tr class="total"><td colspan="4">Total</td><td class="num">${fmt(total)}</td></tr></tbody>
     </table>`;
@@ -561,12 +561,12 @@ function renderReport() {
 
 function exportCSV() {
   const list = reportEntries();
-  if (!list.length) return toast('Rien à exporter', true);
+  if (!list.length) return toast('Nothing to export', true);
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['Date', 'Client', 'Projet', 'Description', 'Durée (h:mm)', 'Heures (décimal)', 'Minutes']]
-    .concat(list.map(e => [e.date, getClient(e.clientId)?.name, getProject(e.projectId)?.name, e.description, fmt(e.minutes), fmtDec(e.minutes), e.minutes]));
+  const rows = [['Date', 'Client', 'Project', 'Description', 'Duration (h:mm)', 'Hours (decimal)', 'Minutes']]
+    .concat(list.map(e => [e.date, getClient(e.clientId)?.name, getProject(e.projectId)?.name, e.description, fmt(e.minutes), fmtDec(e.minutes).replace('.', ','), e.minutes]));
   const csv = '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n');
-  download(csv, `prestations_${periodRange().join('_').replace(/0000-00-00|9999-12-31/g, 'tout')}.csv`, 'text/csv;charset=utf-8');
+  download(csv, `timesheet_${periodRange().join('_').replace(/0000-00-00|9999-12-31/g, 'all')}.csv`, 'text/csv;charset=utf-8');
 }
 function download(content, name, type) {
   const a = document.createElement('a');
@@ -579,36 +579,36 @@ function download(content, name, type) {
 function renderManage() {
   const showArch = $('#show-archived').checked;
   const clients = db.clients.filter(c => showArch || !c.archived).sort(byName);
-  if (!clients.length) { $('#manage-list').innerHTML = '<div class="card muted">Aucun client pour l\'instant.</div>'; return; }
+  if (!clients.length) { $('#manage-list').innerHTML = '<div class="card muted">No clients yet.</div>'; return; }
   $('#manage-list').innerHTML = clients.map(c => {
     const projs = db.projects.filter(p => p.clientId === c.id && (showArch || !p.archived)).sort(byName);
     const hasEntries = db.entries.some(e => e.clientId === c.id);
     return `<div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:10px">
-        <h3>${esc(c.name)} ${c.archived ? '<span class="tag">archivé</span>' : ''}</h3>
+        <h3>${esc(c.name)} ${c.archived ? '<span class="tag">archived</span>' : ''}</h3>
         <div class="row">
-          <button class="btn ghost small" data-act="rename-client" data-id="${c.id}">Renommer</button>
-          <button class="btn ghost small" data-act="archive-client" data-id="${c.id}">${c.archived ? 'Désarchiver' : 'Archiver'}</button>
-          <button class="btn ghost small danger" data-act="del-client" data-id="${c.id}" ${hasEntries ? 'disabled title="Ce client a des prestations : archive-le plutôt"' : ''}>Supprimer</button>
+          <button class="btn ghost small" data-act="rename-client" data-id="${c.id}">Rename</button>
+          <button class="btn ghost small" data-act="archive-client" data-id="${c.id}">${c.archived ? 'Unarchive' : 'Archive'}</button>
+          <button class="btn ghost small danger" data-act="del-client" data-id="${c.id}" ${hasEntries ? 'disabled title="This client has entries: archive it instead"' : ''}>Delete</button>
         </div>
       </div>
-      ${projs.length ? `<table><thead><tr><th>Projet</th><th class="num">Vendu</th><th class="num">Consommé</th><th class="num">Reste</th><th></th></tr></thead><tbody>
+      ${projs.length ? `<table><thead><tr><th>Project</th><th class="num">Sold</th><th class="num">Used</th><th class="num">Remaining</th><th></th></tr></thead><tbody>
         ${projs.map(p => {
           const used = usedMinutes(p.id), over = p.soldMinutes && used > p.soldMinutes, has = db.entries.some(e => e.projectId === p.id);
-          return `<tr><td>${esc(p.name)} ${p.archived ? '<span class="tag">archivé</span>' : ''}</td>
-            <td class="num">${p.soldMinutes ? fmt(p.soldMinutes) : '<span class="muted">régie</span>'}</td>
+          return `<tr><td>${esc(p.name)} ${p.archived ? '<span class="tag">archived</span>' : ''}</td>
+            <td class="num">${p.soldMinutes ? fmt(p.soldMinutes) : '<span class="muted">T&amp;M</span>'}</td>
             <td class="num">${fmt(used)}${p.soldMinutes ? `<div class="progress ${over ? 'over' : ''}"><div style="width:${Math.min(100, used / p.soldMinutes * 100)}%"></div></div>` : ''}</td>
             <td class="num ${over ? 'err' : ''}">${p.soldMinutes ? fmt(p.soldMinutes - used) : '—'}</td>
             <td class="num"><div class="row" style="justify-content:flex-end">
-              <button class="btn ghost small" data-act="edit-project" data-id="${p.id}">Modifier</button>
-              <button class="btn ghost small" data-act="archive-project" data-id="${p.id}">${p.archived ? 'Désarchiver' : 'Archiver'}</button>
-              <button class="btn ghost small danger" data-act="del-project" data-id="${p.id}" ${has ? 'disabled title="Ce projet a des prestations : archive-le plutôt"' : ''}>Suppr.</button>
+              <button class="btn ghost small" data-act="edit-project" data-id="${p.id}">Edit</button>
+              <button class="btn ghost small" data-act="archive-project" data-id="${p.id}">${p.archived ? 'Unarchive' : 'Archive'}</button>
+              <button class="btn ghost small danger" data-act="del-project" data-id="${p.id}" ${has ? 'disabled title="This project has entries: archive it instead"' : ''}>Delete</button>
             </div></td></tr>`;
-        }).join('')}</tbody></table>` : '<p class="muted" style="margin:0 0 8px">Aucun projet.</p>'}
+        }).join('')}</tbody></table>` : '<p class="muted" style="margin:0 0 8px">No projects.</p>'}
       <form class="row add-project" data-client="${c.id}" style="margin-top:10px">
-        <input name="name" placeholder="Nouveau projet" style="flex:2;min-width:160px" required>
-        <input name="sold" placeholder="Temps vendu (ex. 20:00) — optionnel" style="flex:1;min-width:160px">
-        <button class="btn ghost" type="submit">Ajouter le projet</button>
+        <input name="name" placeholder="New project" style="flex:2;min-width:160px" required>
+        <input name="sold" placeholder="Pre-sold time (e.g. 20:00) — optional" style="flex:1;min-width:160px">
+        <button class="btn ghost" type="submit">Add project</button>
       </form>
     </div>`;
   }).join('');
@@ -616,7 +616,7 @@ function renderManage() {
 
 function addClient(name) {
   name = (name || '').trim(); if (!name) return null;
-  if (db.clients.some(c => c.name.toLowerCase() === name.toLowerCase())) { toast('Ce client existe déjà', true); return null; }
+  if (db.clients.some(c => c.name.toLowerCase() === name.toLowerCase())) { toast('This client already exists', true); return null; }
   const c = {id: uid(), name, archived: false};
   mutate('upsert', 'clients', c); return c;
 }
@@ -625,13 +625,13 @@ function addProject(clientId, name, soldRaw) {
   let sold = null;
   if (soldRaw && String(soldRaw).trim()) {
     sold = parseDuration(soldRaw);
-    if (sold == null) { toast('Temps vendu non reconnu (ex. 20:00 ou 20)', true); return null; }
+    if (sold == null) { toast('Unrecognised pre-sold time (e.g. 20:00 or 20)', true); return null; }
   }
   const p = {id: uid(), clientId, name, soldMinutes: sold || null, archived: false};
   mutate('upsert', 'projects', p); return p;
 }
 
-/* ---------- Réglages ---------- */
+/* ---------- Settings ---------- */
 function renderSettings() {
   $('#s-mode').value = cfg.mode; $('#s-url').value = cfg.url; $('#s-token').value = cfg.token;
   toggleSheetsFields();
@@ -653,7 +653,7 @@ function showTab(name) {
   if (name === 'settings') renderSettings();
 }
 
-/* ---------- Événements ---------- */
+/* ---------- Events ---------- */
 $$('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 window.addEventListener('load', () => { const l = $('#logo-slot .logo'); if (l) $('#print-logo').appendChild(l.cloneNode(true)); });
 
@@ -666,50 +666,50 @@ $$('.chips button').forEach(b => b.onclick = () => { $('#f-dur').value = fmt(+b.
 $('#list-range').onchange = renderEntryList;
 
 $('#quick-client').onclick = () => {
-  const c = addClient(prompt('Nom du nouveau client :'));
-  if (c) { $('#f-client').value = ''; fillClientSelect($('#f-client'), {selected: c.id}); fillProjectSelect($('#f-project'), c.id); refreshFormHints(); toast('Client ajouté'); }
+  const c = addClient(prompt('New client name:'));
+  if (c) { $('#f-client').value = ''; fillClientSelect($('#f-client'), {selected: c.id}); fillProjectSelect($('#f-project'), c.id); refreshFormHints(); toast('Client added'); }
 };
 $('#quick-project').onclick = () => {
   const cid = $('#f-client').value;
-  if (!cid) return toast('Choisis d\'abord un client', true);
-  const name = prompt(`Nouveau projet pour ${getClient(cid).name} :`); if (!name) return;
-  const sold = prompt('Temps vendu à l\'avance (ex. 20:00) — laisser vide si en régie :', '');
+  if (!cid) return toast('Select a client first', true);
+  const name = prompt(`New project for ${getClient(cid).name}:`); if (!name) return;
+  const sold = prompt('Pre-sold time (e.g. 20:00) — leave empty for time & materials:', '');
   const p = addProject(cid, name, sold);
-  if (p) { fillProjectSelect($('#f-project'), cid, {selected: p.id}); refreshFormHints(); toast('Projet ajouté'); }
+  if (p) { fillProjectSelect($('#f-project'), cid, {selected: p.id}); refreshFormHints(); toast('Project added'); }
 };
 
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
   const id = b.dataset.id, act = b.dataset.act;
   if (act === 'edit-entry') startEdit(id);
-  if (act === 'del-entry' && confirm('Supprimer cette prestation ?')) { if (editingId === id) stopEdit(); mutate('delete', 'entries', id); renderAll(); }
+  if (act === 'del-entry' && confirm('Delete this entry?')) { if (editingId === id) stopEdit(); mutate('delete', 'entries', id); renderAll(); }
   if (act === 'rename-client') {
-    const c = getClient(id), n = prompt('Nouveau nom :', c.name);
+    const c = getClient(id), n = prompt('New name:', c.name);
     if (n && n.trim()) { mutate('upsert', 'clients', {...c, name: n.trim()}); renderAll(); }
   }
   if (act === 'archive-client') { const c = getClient(id); mutate('upsert', 'clients', {...c, archived: !c.archived}); renderAll(); }
-  if (act === 'del-client' && confirm('Supprimer ce client et ses projets ?')) {
+  if (act === 'del-client' && confirm('Delete this client and its projects?')) {
     db.projects.filter(p => p.clientId === id).forEach(p => mutate('delete', 'projects', p.id));
     mutate('delete', 'clients', id); renderAll();
   }
   if (act === 'edit-project') {
     const p = getProject(id);
-    const n = prompt('Nom du projet :', p.name); if (n == null) return;
-    const s = prompt('Temps vendu (ex. 20:00) — vide = régie :', p.soldMinutes ? fmt(p.soldMinutes) : ''); if (s == null) return;
+    const n = prompt('Project name:', p.name); if (n == null) return;
+    const s = prompt('Pre-sold time (e.g. 20:00) — empty = time & materials:', p.soldMinutes ? fmt(p.soldMinutes) : ''); if (s == null) return;
     let sold = null;
-    if (s.trim()) { sold = parseDuration(s); if (sold == null) return toast('Temps vendu non reconnu', true); }
+    if (s.trim()) { sold = parseDuration(s); if (sold == null) return toast('Unrecognised pre-sold time', true); }
     mutate('upsert', 'projects', {...p, name: n.trim() || p.name, soldMinutes: sold || null}); renderAll();
   }
   if (act === 'archive-project') { const p = getProject(id); mutate('upsert', 'projects', {...p, archived: !p.archived}); renderAll(); }
-  if (act === 'del-project' && confirm('Supprimer ce projet ?')) { mutate('delete', 'projects', id); renderAll(); }
+  if (act === 'del-project' && confirm('Delete this project?')) { mutate('delete', 'projects', id); renderAll(); }
 });
 
-$('#add-client-form').onsubmit = ev => { ev.preventDefault(); if (addClient($('#new-client').value)) { $('#new-client').value = ''; renderAll(); toast('Client ajouté'); } };
+$('#add-client-form').onsubmit = ev => { ev.preventDefault(); if (addClient($('#new-client').value)) { $('#new-client').value = ''; renderAll(); toast('Client added'); } };
 $('#show-archived').onchange = renderManage;
 $('#manage-list').addEventListener('submit', ev => {
   const f = ev.target.closest('.add-project'); if (!f) return;
   ev.preventDefault();
-  if (addProject(f.dataset.client, f.name.value, f.sold.value)) { renderAll(); toast('Projet ajouté'); }
+  if (addProject(f.dataset.client, f.name.value, f.sold.value)) { renderAll(); toast('Project added'); }
 });
 
 ['#r-period', '#r-from', '#r-to', '#r-project'].forEach(s => $(s).onchange = renderReport);
@@ -721,41 +721,41 @@ $('#s-mode').onchange = toggleSheetsFields;
 $('#s-save').onclick = async () => {
   const wasSheets = cfg.mode === 'sheets';
   cfg = {mode: $('#s-mode').value, url: $('#s-url').value.trim(), token: $('#s-token').value.trim()};
-  if (cfg.mode === 'sheets' && (!cfg.url || !cfg.token)) return toast('URL et jeton requis', true);
+  if (cfg.mode === 'sheets' && (!cfg.url || !cfg.token)) return toast('URL and token required', true);
   localStorage.setItem(LS_CFG, JSON.stringify(cfg));
-  toast('Réglages enregistrés');
+  toast('Settings saved');
   setSync('ok');
   if (cfg.mode === 'sheets' && !wasSheets) {
-    if (confirm('Charger les données depuis le Sheet ?\n\nOK = charger le Sheet (remplace les données locales)\nAnnuler = garder les données locales (utilise ensuite « Envoyer les données locales »)')) remoteLoad();
+    if (confirm('Load data from the Sheet?\n\nOK = load the Sheet (replaces local data)\nCancel = keep local data (then use "Push local data to Sheet")')) remoteLoad();
   }
 };
 $('#s-test').onclick = async () => {
   const keep = cfg; cfg = {mode: 'sheets', url: $('#s-url').value.trim(), token: $('#s-token').value.trim()};
-  try { const j = await api({action: 'all'}); toast(`Connexion OK : ${j.data.clients.length} clients, ${j.data.entries.length} prestations`); }
-  catch (e) { toast('Échec : ' + e.message, true); }
+  try { const j = await api({action: 'all'}); toast(`Connection OK: ${j.data.clients.length} clients, ${j.data.entries.length} entries`); }
+  catch (e) { toast('Failed: ' + e.message, true); }
   finally { cfg = keep; }
 };
 $('#s-pull').onclick = () => remoteLoad();
 $('#s-push').onclick = async () => {
-  if (!confirm('Remplacer le contenu du Google Sheet par les données de ce navigateur ?')) return;
-  try { setSync('busy'); await api({action: 'replaceAll', data: db}); queue = []; saveQueue(); setSync('ok'); toast('Données envoyées'); }
-  catch (e) { setSync('error', e.message); toast('Échec : ' + e.message, true); }
+  if (!confirm('Replace the Google Sheet content with this browser\'s data?')) return;
+  try { setSync('busy'); await api({action: 'replaceAll', data: db}); queue = []; saveQueue(); setSync('ok'); toast('Data pushed'); }
+  catch (e) { setSync('error', e.message); toast('Failed: ' + e.message, true); }
 };
 $('#s-export').onclick = () => download(JSON.stringify(db, null, 2), `timetracker_${today()}.json`, 'application/json');
 $('#s-import').onchange = async ev => {
   const f = ev.target.files[0]; if (!f) return;
   try {
     const data = normalize(JSON.parse(await f.text()));
-    if (!confirm(`Importer ${data.clients.length} clients, ${data.projects.length} projets et ${data.entries.length} prestations ? Les données actuelles seront remplacées.`)) return;
+    if (!confirm(`Import ${data.clients.length} clients, ${data.projects.length} projects and ${data.entries.length} entries? Current data will be replaced.`)) return;
     db = data; persist();
     if (cfg.mode === 'sheets') { queue = []; saveQueue(); await api({action: 'replaceAll', data: db}); }
-    renderAll(); toast('Import réussi');
-  } catch (e) { toast('Import impossible : ' + e.message, true); }
+    renderAll(); toast('Import successful');
+  } catch (e) { toast('Import failed: ' + e.message, true); }
   ev.target.value = '';
 };
 window.addEventListener('online', flush);
 
-/* ---------- Démarrage ---------- */
+/* ---------- Startup ---------- */
 cfg = {...cfg, ...readLS(LS_CFG, {})};
 db = normalize(readLS(LS_DATA, {}));
 queue = readLS(LS_QUEUE, []);
