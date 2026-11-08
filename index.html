@@ -9,14 +9,22 @@
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
 header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-.bar{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.brand{font-weight:700;font-size:16px}
+.bar{max-width:1240px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:16px}
+.brand .sep{width:1px;height:26px;background:var(--line)}
+.logo{height:34px;width:auto;display:block}
+.entry-grid{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);grid-template-areas:"client project" "date dur" "desc desc";column-gap:20px;row-gap:14px;align-items:start}
+.entry-grid .a-client{grid-area:client}.entry-grid .a-project{grid-area:project}.entry-grid .a-date{grid-area:date}.entry-grid .a-dur{grid-area:dur}.entry-grid .a-desc{grid-area:desc}
+.entry-grid .a-date input{max-width:220px}
+@media(max-width:700px){.entry-grid{grid-template-columns:1fr;grid-template-areas:"date" "client" "project" "dur" "desc"}.entry-grid .a-date input{max-width:none}}
+select{appearance:auto;min-height:38px}
+.print-head{display:none;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #000}
 nav{display:flex;gap:4px;flex-wrap:wrap}
 nav button{background:none;border:0;padding:8px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font:inherit}
 nav button.active{background:var(--soft);color:var(--ink);font-weight:600}
 .sync{margin-left:auto;font-size:12px;color:var(--muted)}
 .sync.bad{color:var(--warn)}
-main{max-width:1100px;margin:0 auto;padding:16px}
+main{max-width:1240px;margin:0 auto;padding:16px}
 section{display:none}section.active{display:block}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
 h2{font-size:15px;margin:0 0 12px}
@@ -58,6 +66,7 @@ tr.client td{background:var(--soft);font-weight:700}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 #toast.show{opacity:1}#toast.bad{background:var(--warn)}
 .print-title{display:none}
+@media print{.print-head{display:flex!important}}
 @media print{
   header,.noprint{display:none!important}
   body{background:#fff;font-size:11px}
@@ -73,7 +82,18 @@ tr.client td{background:var(--soft);font-weight:700}
 <body>
 <header>
   <div class="bar">
-    <span class="brand">⏱ Timetracker</span>
+    <template id="logo-fallback">
+      <svg class="logo" viewBox="0 0 150 40" role="img" aria-label="88 Miles!">
+        <rect x="0" y="2" width="44" height="36" rx="6" fill="#1a1a1a"/>
+        <text x="22" y="29" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="24" font-weight="800" fill="#fff">88</text>
+        <text x="52" y="29" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="24" font-weight="700" fill="#1a1a1a" letter-spacing="-0.5">miles!</text>
+      </svg>
+    </template>
+    <span class="brand">
+      <span id="logo-slot"><img class="logo" src="logo.png" alt="88 Miles!" onerror="this.replaceWith(document.getElementById('logo-fallback').content.cloneNode(true))"></span>
+      <span class="sep"></span>
+      <span>Timetracker</span>
+    </span>
     <nav>
       <button data-tab="entry" class="active">Saisie</button>
       <button data-tab="report">Rapports</button>
@@ -89,19 +109,19 @@ tr.client td{background:var(--soft);font-weight:700}
   <section id="tab-entry" class="active">
     <form class="card" id="entry-form" autocomplete="off">
       <h2 id="form-title">Nouvelle prestation</h2>
-      <div class="grid">
-        <div>
+      <div class="grid entry-grid">
+        <div class="a-date">
           <label for="f-date">Date</label>
           <input type="date" id="f-date" required>
         </div>
-        <div>
+        <div class="a-client">
           <label for="f-client">Client</label>
           <div class="with-btn">
             <select id="f-client" required></select>
             <button type="button" class="btn ghost" id="quick-client" title="Nouveau client">+</button>
           </div>
         </div>
-        <div>
+        <div class="a-project">
           <label for="f-project">Projet</label>
           <div class="with-btn">
             <select id="f-project" required></select>
@@ -109,7 +129,7 @@ tr.client td{background:var(--soft);font-weight:700}
           </div>
           <div id="f-budget"></div>
         </div>
-        <div>
+        <div class="a-dur">
           <label for="f-dur">Temps passé (min. 0:30)</label>
           <input id="f-dur" placeholder="1:30 · 1h30 · 1,5 · 90m" inputmode="decimal">
           <div class="chips">
@@ -122,7 +142,7 @@ tr.client td{background:var(--soft);font-weight:700}
           </div>
           <div class="hint" id="f-dur-preview"></div>
         </div>
-        <div class="full">
+        <div class="a-desc">
           <label for="f-desc">Description de la tâche</label>
           <textarea id="f-desc" required placeholder="Ex. Configuration du tag Meta CAPI dans sGTM"></textarea>
         </div>
@@ -172,6 +192,7 @@ tr.client td{background:var(--soft);font-weight:700}
         <button class="btn ghost" id="r-print">Imprimer</button>
       </div>
     </div>
+    <div class="print-head"><span id="print-logo"></span><span>Relevé de prestations</span></div>
     <div class="print-title" id="r-print-title"></div>
     <div class="card"><h2>Synthèse par projet</h2><div id="r-summary"></div></div>
     <div class="card"><h2>Détail</h2><div id="r-detail"></div></div>
@@ -370,7 +391,7 @@ function fillProjectSelect(sel, clientId, {withAll = false, includeArchived = fa
   const list = db.projects.filter(p => (!clientId || p.clientId === clientId) && (includeArchived || !p.archived || p.id === selected)).sort(byName);
   const ph = withAll ? 'Tous les projets' : (clientId ? '— Choisir un projet —' : '— Choisis d\'abord un client —');
   sel.innerHTML = `<option value="">${ph}</option>` + list.map(p =>
-    `<option value="${p.id}">${esc(p.name)}${!clientId ? ' — ' + esc(getClient(p.clientId)?.name) : ''}${p.soldMinutes ? ' · vendu ' + fmt(p.soldMinutes) : ''}${p.archived ? ' (archivé)' : ''}</option>`).join('');
+    `<option value="${p.id}">${esc(p.name)}${!clientId ? ' — ' + esc(getClient(p.clientId)?.name) : ''}${p.archived ? ' (archivé)' : ''}</option>`).join('');
   sel.value = list.some(p => p.id === selected) ? selected : (list.length === 1 && !withAll ? list[0].id : '');
 }
 
@@ -503,7 +524,7 @@ function renderReport() {
   const list = reportEntries();
   const [from, to] = periodRange();
   const periodLabel = $('#r-period').selectedOptions[0].text + (from > '0000' ? ` (${from} → ${to})` : '');
-  $('#r-print-title').textContent = `Relevé de prestations — ${rc.value ? getClient(rc.value)?.name : 'tous clients'} — ${periodLabel}`;
+  $('#r-print-title').textContent = `${rc.value ? getClient(rc.value)?.name : 'tous clients'} — ${periodLabel}`;
 
   // Synthèse
   const groups = {};
@@ -634,6 +655,7 @@ function showTab(name) {
 
 /* ---------- Événements ---------- */
 $$('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+window.addEventListener('load', () => { const l = $('#logo-slot .logo'); if (l) $('#print-logo').appendChild(l.cloneNode(true)); });
 
 $('#entry-form').onsubmit = saveEntry;
 $('#f-cancel').onclick = stopEdit;
