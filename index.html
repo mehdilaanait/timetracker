@@ -67,6 +67,25 @@ tr.client td{background:var(--soft);font-weight:700}
 #toast.show{opacity:1}#toast.bad{background:var(--warn)}
 .print-title{display:none}
 @media print{.print-head{display:flex!important}}
+#pdf-report{display:none}
+@media print{
+  body.print-pdf main > section:not(#tab-report), body.print-pdf #tab-report > *:not(#pdf-report){display:none!important}
+  body.print-pdf #tab-report{display:block!important}
+  body.print-pdf #pdf-report{display:block!important}
+  @page{size:A4;margin:16mm 14mm}
+}
+#pdf-report .pdf-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+#pdf-report .pdf-top .logo{height:40px}
+#pdf-report h1{font-size:20px;margin:0 0 4px;text-align:right}
+#pdf-report .pdf-meta{font-size:12px;text-align:right;line-height:1.5}
+#pdf-report h2{font-size:14px;margin:18px 0 6px}
+#pdf-report table{font-size:11px;page-break-inside:auto}
+#pdf-report tr{page-break-inside:avoid}
+#pdf-report th{background:#e6e6e6!important;color:#000;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#pdf-report .sub td{font-weight:700;border-top:1px solid #000}
+#pdf-report .grand{margin-top:16px;margin-left:auto;width:50%;font-size:12px}
+#pdf-report .grand td{padding:5px 8px}
+#pdf-report .grand tr:last-child td{font-weight:700;font-size:13px;border-top:2px solid #000;border-bottom:0}
 @media print{
   header,.noprint{display:none!important}
   body{background:#fff;font-size:11px}
@@ -189,11 +208,13 @@ tr.client td{background:var(--soft);font-weight:700}
       </div>
       <div class="row" style="margin-top:12px">
         <button class="btn ghost" id="r-csv">Export CSV</button>
-        <button class="btn ghost" id="r-print">Print</button>
+        <button class="btn" id="r-pdf">Save PDF (tasks + total)</button>
+        <button class="btn ghost" id="r-print">Print full report</button>
       </div>
     </div>
     <div class="print-head"><span id="print-logo"></span><span>Timesheet report</span></div>
     <div class="print-title" id="r-print-title"></div>
+    <div id="pdf-report"></div>
     <div class="card"><h2>Summary by project</h2><div id="r-summary"></div></div>
     <div class="card"><h2>To invoice</h2><div id="r-invoice"></div></div>
     <div class="card"><h2>Details</h2><div id="r-detail"></div></div>
@@ -779,7 +800,58 @@ $('#manage-list').addEventListener('submit', ev => {
 ['#r-period', '#r-from', '#r-to', '#r-project'].forEach(s => $(s).onchange = renderReport);
 $('#r-client').onchange = () => { $('#r-project').value = ''; renderReport(); };
 $('#r-csv').onclick = exportCSV;
-$('#r-print').onclick = () => window.print();
+$('#r-print').onclick = () => { document.body.classList.remove('print-pdf'); window.print(); };
+$('#r-pdf').onclick = savePdf;
+window.addEventListener('afterprint', () => { document.body.classList.remove('print-pdf'); if (savePdf.title) { document.title = savePdf.title; savePdf.title = null; } });
+
+function savePdf() {
+  const list = reportEntries();
+  if (!list.length) return toast('Nothing to export', true);
+  const [from, to] = periodRange();
+  const all = from === '0000-00-00';
+  const fmtD = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'});
+  const periodTxt = all ? 'All time' : `${fmtD(from)} – ${fmtD(to)}`;
+  const byClient = {};
+  list.forEach(e => (byClient[e.clientId] ||= []).push(e));
+  const cids = Object.keys(byClient).sort((a, b) => (getClient(a)?.name || '').localeCompare(getClient(b)?.name || '', 'fr'));
+  const projFilter = $('#r-project').value ? getProject($('#r-project').value)?.name : null;
+  let gMin = 0, gAmt = 0, missing = false;
+  const sections = cids.map(cid => {
+    const items = byClient[cid];
+    const min = items.reduce((a, e) => a + e.minutes, 0);
+    // amount per project (rounded per invoice line), then summed
+    const perProj = {};
+    items.forEach(e => perProj[e.projectId] = (perProj[e.projectId] || 0) + e.minutes);
+    const amt = round2(Object.entries(perProj).reduce((a, [pid, m]) => { const r = rateFor(pid); if (r == null) missing = true; return a + (amountFor(m, r) ?? 0); }, 0));
+    gMin += min; gAmt += amt;
+    const multiProj = Object.keys(perProj).length > 1;
+    return `${cids.length > 1 ? `<h2>${esc(getClient(cid)?.name || '?')}</h2>` : ''}
+      <table>
+        <thead><tr><th style="width:90px">Date</th>${multiProj ? '<th>Project</th>' : ''}<th>Task</th><th class="num" style="width:70px">Hours</th></tr></thead>
+        <tbody>${items.map(e => `<tr><td style="white-space:nowrap">${fmtD(e.date)}</td>${multiProj ? `<td>${esc(getProject(e.projectId)?.name)}</td>` : ''}<td>${esc(e.description)}</td><td class="num">${fmt(e.minutes)}</td></tr>`).join('')}
+        ${cids.length > 1 ? `<tr class="sub"><td colspan="${multiProj ? 3 : 2}">Subtotal — ${fmtDec(min)} h</td><td class="num">${money(amt)}</td></tr>` : ''}</tbody>
+      </table>`;
+  }).join('');
+  if (missing && !confirm('Some projects have no hourly rate: the total excl. VAT will be incomplete. Continue?')) return;
+  const clientName = cids.length === 1 ? getClient(cids[0])?.name : 'All clients';
+  const logo = $('#logo-slot .logo');
+  $('#pdf-report').innerHTML = `
+    <div class="pdf-top">
+      <div>${logo ? logo.outerHTML : ''}</div>
+      <div><h1>Timesheet</h1>
+        <div class="pdf-meta"><b>${esc(clientName)}</b>${projFilter ? ' · ' + esc(projFilter) : ''}<br>${periodTxt}</div></div>
+    </div>
+    ${sections}
+    <table class="grand">
+      <tr><td>Total hours</td><td class="num">${fmt(gMin)} (${fmtDec(gMin)} h)</td></tr>
+      <tr><td>Total excl. VAT</td><td class="num">${money(gAmt)}</td></tr>
+    </table>`;
+  savePdf.title = document.title;
+  const slug = v => String(v || '').replace(/[^\w-]+/g, '_').replace(/^_|_$/g, '');
+  document.title = `Timesheet_${slug(clientName)}_${all ? 'all' : from + '_' + to}`;
+  document.body.classList.add('print-pdf');
+  window.print();
+}
 
 $('#s-mode').onchange = toggleSheetsFields;
 $('#s-save').onclick = async () => {
