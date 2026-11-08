@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timetracker</title>
+<style>
+:root{--bg:#f6f6f5;--card:#fff;--ink:#1a1a1a;--muted:#6b6b6b;--line:#e2e2e0;--soft:#efefed;--warn:#b42318}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.bar{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:16px}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:none;border:0;padding:8px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font:inherit}
+nav button.active{background:var(--soft);color:var(--ink);font-weight:600}
+.sync{margin-left:auto;font-size:12px;color:var(--muted)}
+.sync.bad{color:var(--warn)}
+main{max-width:1100px;margin:0 auto;padding:16px}
+section{display:none}section.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+h2{font-size:15px;margin:0 0 12px}
+h3{font-size:14px;margin:0}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.full{grid-column:1/-1}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff;color:var(--ink)}
+textarea{resize:vertical;min-height:64px}
+input:focus,select:focus,textarea:focus{outline:2px solid #999;outline-offset:-1px}
+.with-btn{display:flex;gap:6px}.with-btn select{flex:1}
+.btn{padding:8px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;font:inherit;font-weight:600;white-space:nowrap}
+.btn.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+.btn.small{padding:3px 8px;font-size:12px;font-weight:500}
+.btn.danger{color:var(--warn)}
+.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.chips button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:2px 10px;font:inherit;font-size:12px;cursor:pointer}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.err{color:var(--warn);font-weight:600}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;background:#eee;font-weight:700}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.total td{font-weight:700;border-top:2px solid var(--ink)}
+tr.client td{background:var(--soft);font-weight:700}
+.progress{height:6px;background:var(--soft);border-radius:3px;overflow:hidden;margin-top:4px;min-width:80px}
+.progress>div{height:100%;background:var(--ink)}
+.progress.over>div{background:var(--warn)}
+.day{font-weight:700;margin:16px 0 4px;display:flex;justify-content:space-between;border-bottom:1px solid var(--ink);padding-bottom:2px}
+.entry{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.entry .what{flex:1;min-width:0}
+.entry .meta{font-size:12px;color:var(--muted)}
+.entry .dur{font-weight:700;font-variant-numeric:tabular-nums;min-width:48px;text-align:right}
+.muted{color:var(--muted)}
+.editing{outline:2px solid var(--ink)}
+.tag{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--muted)}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+#toast.show{opacity:1}#toast.bad{background:var(--warn)}
+.print-title{display:none}
+@media print{
+  header,.noprint{display:none!important}
+  body{background:#fff;font-size:11px}
+  main{padding:0}
+  .card{border:0;padding:0;margin-bottom:12px}
+  .print-title{display:block;font-size:16px;font-weight:700;margin-bottom:8px}
+  th{background:#e6e6e6!important;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  tr.client td{background:#f2f2f2!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .progress{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <span class="brand">⏱ Timetracker</span>
+    <nav>
+      <button data-tab="entry" class="active">Saisie</button>
+      <button data-tab="report">Rapports</button>
+      <button data-tab="manage">Clients &amp; projets</button>
+      <button data-tab="settings">Réglages</button>
+    </nav>
+    <span class="sync" id="sync"></span>
+  </div>
+</header>
+
+<main>
+  <!-- SAISIE -->
+  <section id="tab-entry" class="active">
+    <form class="card" id="entry-form" autocomplete="off">
+      <h2 id="form-title">Nouvelle prestation</h2>
+      <div class="grid">
+        <div>
+          <label for="f-date">Date</label>
+          <input type="date" id="f-date" required>
+        </div>
+        <div>
+          <label for="f-client">Client</label>
+          <div class="with-btn">
+            <select id="f-client" required></select>
+            <button type="button" class="btn ghost" id="quick-client" title="Nouveau client">+</button>
+          </div>
+        </div>
+        <div>
+          <label for="f-project">Projet</label>
+          <div class="with-btn">
+            <select id="f-project" required></select>
+            <button type="button" class="btn ghost" id="quick-project" title="Nouveau projet">+</button>
+          </div>
+          <div id="f-budget"></div>
+        </div>
+        <div>
+          <label for="f-dur">Temps passé (min. 0:30)</label>
+          <input id="f-dur" placeholder="1:30 · 1h30 · 1,5 · 90m" inputmode="decimal">
+          <div class="chips">
+            <button type="button" data-dur="30">0:30</button>
+            <button type="button" data-dur="60">1:00</button>
+            <button type="button" data-dur="90">1:30</button>
+            <button type="button" data-dur="120">2:00</button>
+            <button type="button" data-dur="240">4:00</button>
+            <button type="button" data-dur="480">8:00</button>
+          </div>
+          <div class="hint" id="f-dur-preview"></div>
+        </div>
+        <div class="full">
+          <label for="f-desc">Description de la tâche</label>
+          <textarea id="f-desc" required placeholder="Ex. Configuration du tag Meta CAPI dans sGTM"></textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" type="submit" id="f-submit">Enregistrer</button>
+        <button class="btn ghost" type="button" id="f-cancel" hidden>Annuler la modification</button>
+      </div>
+    </form>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">Dernières prestations</h2>
+        <select id="list-range" style="width:auto">
+          <option value="7">7 derniers jours</option>
+          <option value="31" selected>31 derniers jours</option>
+          <option value="all">Tout</option>
+        </select>
+      </div>
+      <div id="entry-list"></div>
+    </div>
+  </section>
+
+  <!-- RAPPORTS -->
+  <section id="tab-report">
+    <div class="card noprint">
+      <h2>Filtres</h2>
+      <div class="grid">
+        <div>
+          <label for="r-period">Période</label>
+          <select id="r-period">
+            <option value="week">Cette semaine</option>
+            <option value="month" selected>Ce mois-ci</option>
+            <option value="lastmonth">Mois précédent</option>
+            <option value="year">Cette année</option>
+            <option value="all">Tout</option>
+            <option value="custom">Personnalisée…</option>
+          </select>
+        </div>
+        <div class="custom-range"><label for="r-from">Du</label><input type="date" id="r-from"></div>
+        <div class="custom-range"><label for="r-to">Au</label><input type="date" id="r-to"></div>
+        <div><label for="r-client">Client</label><select id="r-client"></select></div>
+        <div><label for="r-project">Projet</label><select id="r-project"></select></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost" id="r-csv">Exporter CSV</button>
+        <button class="btn ghost" id="r-print">Imprimer</button>
+      </div>
+    </div>
+    <div class="print-title" id="r-print-title"></div>
+    <div class="card"><h2>Synthèse par projet</h2><div id="r-summary"></div></div>
+    <div class="card"><h2>Détail</h2><div id="r-detail"></div></div>
+  </section>
+
+  <!-- CLIENTS & PROJETS -->
+  <section id="tab-manage">
+    <div class="card">
+      <h2>Ajouter un client</h2>
+      <form class="row" id="add-client-form">
+        <input id="new-client" placeholder="Nom du client" style="flex:1;min-width:200px" required>
+        <button class="btn" type="submit">Ajouter</button>
+      </form>
+      <label class="row" style="margin-top:12px;font-weight:400;color:var(--ink)">
+        <input type="checkbox" id="show-archived" style="width:auto"> Afficher les éléments archivés
+      </label>
+    </div>
+    <div id="manage-list"></div>
+  </section>
+
+  <!-- RÉGLAGES -->
+  <section id="tab-settings">
+    <div class="card">
+      <h2>Stockage des données</h2>
+      <div class="grid">
+        <div class="full">
+          <label for="s-mode">Mode</label>
+          <select id="s-mode">
+            <option value="local">Local (ce navigateur uniquement)</option>
+            <option value="sheets">Google Sheets (via Apps Script)</option>
+          </select>
+          <div class="hint">En mode local, les données restent dans ce navigateur : pense à exporter une sauvegarde JSON régulièrement. Le mode Google Sheets synchronise tous tes appareils.</div>
+        </div>
+        <div class="full sheets-only"><label for="s-url">URL de l'application web Apps Script</label><input id="s-url" placeholder="https://script.google.com/macros/s/…/exec"></div>
+        <div class="full sheets-only"><label for="s-token">Jeton d'accès (API_TOKEN)</label><input id="s-token" type="password"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="s-save">Enregistrer les réglages</button>
+        <button class="btn ghost sheets-only" id="s-test">Tester la connexion</button>
+        <button class="btn ghost sheets-only" id="s-pull">Recharger depuis le Sheet</button>
+        <button class="btn ghost sheets-only" id="s-push">Envoyer les données locales vers le Sheet</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Sauvegarde</h2>
+      <div class="row">
+        <button class="btn ghost" id="s-export">Exporter (JSON)</button>
+        <label class="btn ghost" style="margin:0;color:var(--ink);font-size:14px">Importer (JSON)
+          <input type="file" id="s-import" accept="application/json,.json" hidden>
+        </label>
+      </div>
+      <div class="hint">L'import remplace toutes les données actuelles.</div>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ---------- Constantes & utilitaires ---------- */
+const MIN_MINUTES = 30;
+const LS_DATA = 'tt_data_v1', LS_CFG = 'tt_cfg_v1', LS_QUEUE = 'tt_queue_v1', LS_LAST = 'tt_last_v1';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const isoDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today = () => isoDate(new Date());
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const byName = (a, b) => a.name.localeCompare(b.name, 'fr', {sensitivity: 'base'});
+const fmt = min => { const m = Math.abs(Math.round(min || 0)); return `${min < 0 ? '-' : ''}${Math.floor(m/60)}:${pad(m%60)}`; };
+const fmtDec = min => (Math.round(min / 60 * 100) / 100).toString().replace('.', ',');
+const fmtDay = iso => new Date(iso + 'T12:00:00').toLocaleDateString('fr-BE', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+/** Accepte : 1:30 · 1h30 · 1h · 1,5 · 1.5 · 90m · 90min */
+function parseDuration(s) {
+  s = String(s || '').trim().toLowerCase().replace(',', '.').replace(/\s+/g, '');
+  if (!s) return null;
+  let m;
+  if ((m = s.match(/^(\d+):([0-5]\d)$/))) return +m[1] * 60 + +m[2];
+  if ((m = s.match(/^(\d+(?:\.\d+)?)h(\d{1,2})?(?:m|min)?$/))) return Math.round(+m[1] * 60 + (+m[2] || 0));
+  if ((m = s.match(/^(\d+)(?:m|min)$/))) return +m[1];
+  if (/^\d+(?:\.\d+)?$/.test(s)) return Math.round(parseFloat(s) * 60);
+  return null;
+}
+
+function toast(msg, bad = false) {
+  const t = $('#toast');
+  t.textContent = msg; t.className = 'show' + (bad ? ' bad' : '');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.className = '', 2600);
+}
+
+/* ---------- État ---------- */
+let db = {clients: [], projects: [], entries: []};
+let cfg = {mode: 'local', url: '', token: ''};
+let queue = [];
+let editingId = null;
+let syncState = {status: 'ok', msg: ''};
+
+const readLS = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } };
+const persist = () => localStorage.setItem(LS_DATA, JSON.stringify(db));
+const saveQueue = () => localStorage.setItem(LS_QUEUE, JSON.stringify(queue));
+
+function normalize(d) {
+  const b = v => v === true || v === 'true' || v === 'TRUE';
+  const n = v => (v === '' || v == null || isNaN(Number(v))) ? null : Number(v);
+  return {
+    clients: (d.clients || []).filter(c => c.id).map(c => ({id: String(c.id), name: String(c.name || ''), archived: b(c.archived)})),
+    projects: (d.projects || []).filter(p => p.id).map(p => ({id: String(p.id), clientId: String(p.clientId), name: String(p.name || ''), soldMinutes: n(p.soldMinutes), archived: b(p.archived)})),
+    entries: (d.entries || []).filter(e => e.id).map(e => ({id: String(e.id), date: String(e.date).slice(0, 10), clientId: String(e.clientId), projectId: String(e.projectId), description: String(e.description || ''), minutes: Number(e.minutes) || 0, createdAt: String(e.createdAt || '')}))
+  };
+}
+
+const getClient = id => db.clients.find(c => c.id === id);
+const getProject = id => db.projects.find(p => p.id === id);
+const usedMinutes = (pid, excludeId) => db.entries.filter(e => e.projectId === pid && e.id !== excludeId).reduce((a, e) => a + e.minutes, 0);
+
+/* ---------- Synchronisation Google Sheets ---------- */
+async function api(payload) {
+  const r = await fetch(cfg.url, {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'}, // évite le preflight CORS
+    body: JSON.stringify({...payload, token: cfg.token})
+  });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Erreur inconnue');
+  return j;
+}
+
+let flushing = false;
+async function flush() {
+  if (cfg.mode !== 'sheets' || flushing) return;
+  flushing = true;
+  try {
+    while (queue.length) {
+      setSync('busy');
+      await api(queue[0]);
+      queue.shift(); saveQueue();
+    }
+    setSync('ok');
+  } catch (e) {
+    setSync('error', e.message);
+  } finally { flushing = false; }
+}
+
+async function remoteLoad(silent = false) {
+  if (cfg.mode !== 'sheets') return;
+  try {
+    setSync('busy');
+    await flush();
+    if (queue.length) return; // ne pas écraser des modifs non envoyées
+    const j = await api({action: 'all'});
+    db = normalize(j.data); persist(); renderAll();
+    setSync('ok');
+    if (!silent) toast('Données rechargées depuis le Sheet');
+  } catch (e) {
+    setSync('error', e.message);
+    if (!silent) toast('Connexion impossible : ' + e.message, true);
+  }
+}
+
+function setSync(status, msg = '') {
+  syncState = {status, msg};
+  const el = $('#sync');
+  if (cfg.mode === 'local') { el.textContent = 'Stockage local'; el.className = 'sync'; return; }
+  const pending = queue.length ? ` · ${queue.length} en attente` : '';
+  const label = {ok: 'synchronisé', busy: 'synchronisation…', error: 'erreur de synchro'}[status];
+  el.textContent = `Google Sheets · ${label}${pending}`;
+  el.title = msg;
+  el.className = 'sync' + (status === 'error' ? ' bad' : '');
+}
+
+/** Toute modification passe par ici */
+function mutate(action, table, payload) {
+  if (action === 'upsert') {
+    const arr = db[table]; const i = arr.findIndex(x => x.id === payload.id);
+    if (i >= 0) arr[i] = payload; else arr.push(payload);
+  } else if (action === 'delete') {
+    db[table] = db[table].filter(x => x.id !== payload);
+  }
+  persist();
+  if (cfg.mode === 'sheets') {
+    queue.push(action === 'upsert' ? {action, table, record: payload} : {action, table, id: payload});
+    saveQueue(); flush();
+  }
+}
+
+/* ---------- Saisie ---------- */
+function fillClientSelect(sel, {withAll = false, includeArchived = false, selected = ''} = {}) {
+  const list = db.clients.filter(c => includeArchived || !c.archived || c.id === selected).sort(byName);
+  sel.innerHTML = (withAll ? '<option value="">Tous les clients</option>' : '<option value="">— Choisir un client —</option>') +
+    list.map(c => `<option value="${c.id}">${esc(c.name)}${c.archived ? ' (archivé)' : ''}</option>`).join('');
+  sel.value = list.some(c => c.id === selected) ? selected : '';
+}
+function fillProjectSelect(sel, clientId, {withAll = false, includeArchived = false, selected = ''} = {}) {
+  const list = db.projects.filter(p => (!clientId || p.clientId === clientId) && (includeArchived || !p.archived || p.id === selected)).sort(byName);
+  const ph = withAll ? 'Tous les projets' : (clientId ? '— Choisir un projet —' : '— Choisis d\'abord un client —');
+  sel.innerHTML = `<option value="">${ph}</option>` + list.map(p =>
+    `<option value="${p.id}">${esc(p.name)}${!clientId ? ' — ' + esc(getClient(p.clientId)?.name) : ''}${p.soldMinutes ? ' · vendu ' + fmt(p.soldMinutes) : ''}${p.archived ? ' (archivé)' : ''}</option>`).join('');
+  sel.value = list.some(p => p.id === selected) ? selected : (list.length === 1 && !withAll ? list[0].id : '');
+}
+
+function budgetHtml(p, extra = 0, excludeId = null) {
+  if (!p) return '';
+  if (!p.soldMinutes) return '<div class="hint">Pas de temps vendu à l\'avance (en régie).</div>';
+  const used = usedMinutes(p.id, excludeId) + extra;
+  const over = used > p.soldMinutes;
+  const pct = Math.min(100, used / p.soldMinutes * 100);
+  return `<div class="hint">Vendu ${fmt(p.soldMinutes)} · consommé ${fmt(used)} · ` +
+    `<span class="${over ? 'err' : ''}">${over ? 'dépassement ' + fmt(used - p.soldMinutes) : 'reste ' + fmt(p.soldMinutes - used)}</span></div>` +
+    `<div class="progress ${over ? 'over' : ''}"><div style="width:${pct}%"></div></div>`;
+}
+
+function refreshFormHints() {
+  const p = getProject($('#f-project').value);
+  const raw = $('#f-dur').value;
+  const min = parseDuration(raw);
+  const prev = $('#f-dur-preview');
+  if (!raw) prev.innerHTML = '';
+  else if (min == null) prev.innerHTML = '<span class="err">Format non reconnu</span>';
+  else if (min < MIN_MINUTES) prev.innerHTML = `<span class="err">= ${fmt(min)} · minimum 0:30</span>`;
+  else prev.innerHTML = `= ${fmt(min)} (${fmtDec(min)} h)`;
+  $('#f-budget').innerHTML = budgetHtml(p, (min && min >= MIN_MINUTES) ? min : 0, editingId);
+}
+
+function renderForm() {
+  const last = readLS(LS_LAST, {});
+  const cSel = $('#f-client'), pSel = $('#f-project');
+  const curC = cSel.value || last.clientId || '';
+  fillClientSelect(cSel, {selected: curC});
+  fillProjectSelect(pSel, cSel.value, {selected: pSel.value || (cSel.value === last.clientId ? last.projectId : '')});
+  if (!$('#f-date').value) $('#f-date').value = today();
+  refreshFormHints();
+}
+
+function startEdit(id) {
+  const e = db.entries.find(x => x.id === id); if (!e) return;
+  editingId = id;
+  $('#f-date').value = e.date;
+  fillClientSelect($('#f-client'), {selected: e.clientId});
+  fillProjectSelect($('#f-project'), e.clientId, {selected: e.projectId});
+  $('#f-desc').value = e.description;
+  $('#f-dur').value = fmt(e.minutes);
+  $('#form-title').textContent = 'Modifier la prestation';
+  $('#f-submit').textContent = 'Mettre à jour';
+  $('#f-cancel').hidden = false;
+  $('#entry-form').classList.add('editing');
+  refreshFormHints();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+function stopEdit() {
+  editingId = null;
+  $('#form-title').textContent = 'Nouvelle prestation';
+  $('#f-submit').textContent = 'Enregistrer';
+  $('#f-cancel').hidden = true;
+  $('#entry-form').classList.remove('editing');
+  $('#f-desc').value = ''; $('#f-dur').value = '';
+  refreshFormHints();
+}
+
+function saveEntry(ev) {
+  ev.preventDefault();
+  const clientId = $('#f-client').value, projectId = $('#f-project').value;
+  const description = $('#f-desc').value.trim(), date = $('#f-date').value;
+  const minutes = parseDuration($('#f-dur').value);
+  if (!date) return toast('Indique une date', true);
+  if (!clientId) return toast('Choisis un client', true);
+  if (!projectId) return toast('Choisis un projet', true);
+  if (!description) return toast('Ajoute une description', true);
+  if (minutes == null) return toast('Durée non reconnue (ex. 1:30)', true);
+  if (minutes < MIN_MINUTES) return toast('Durée minimum : 0:30', true);
+  const old = editingId && db.entries.find(e => e.id === editingId);
+  mutate('upsert', 'entries', {id: editingId || uid(), date, clientId, projectId, description, minutes, createdAt: old?.createdAt || new Date().toISOString()});
+  localStorage.setItem(LS_LAST, JSON.stringify({clientId, projectId}));
+  toast(old ? 'Prestation mise à jour' : `Enregistré : ${fmt(minutes)}`);
+  stopEdit(); renderAll();
+  $('#f-desc').focus();
+}
+
+function renderEntryList() {
+  const range = $('#list-range').value;
+  let from = '0000';
+  if (range !== 'all') { const d = new Date(); d.setDate(d.getDate() - Number(range) + 1); from = isoDate(d); }
+  const list = db.entries.filter(e => e.date >= from)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  if (!list.length) { $('#entry-list').innerHTML = '<p class="muted">Aucune prestation sur cette période.</p>'; return; }
+  const byDay = {};
+  list.forEach(e => (byDay[e.date] ||= []).push(e));
+  $('#entry-list').innerHTML = Object.entries(byDay).map(([day, items]) => `
+    <div class="day"><span>${esc(fmtDay(day))}</span><span>${fmt(items.reduce((a, e) => a + e.minutes, 0))}</span></div>
+    ${items.map(e => `
+      <div class="entry">
+        <div class="what">
+          <div>${esc(e.description)}</div>
+          <div class="meta">${esc(getClient(e.clientId)?.name || '?')} · ${esc(getProject(e.projectId)?.name || '?')}</div>
+        </div>
+        <div class="dur">${fmt(e.minutes)}</div>
+        <div class="row noprint">
+          <button class="btn ghost small" data-act="edit-entry" data-id="${e.id}">Modifier</button>
+          <button class="btn ghost small danger" data-act="del-entry" data-id="${e.id}">Suppr.</button>
+        </div>
+      </div>`).join('')}`).join('');
+}
+
+/* ---------- Rapports ---------- */
+function periodRange() {
+  const v = $('#r-period').value, d = new Date(), y = d.getFullYear(), m = d.getMonth();
+  switch (v) {
+    case 'week': { const s = new Date(d); s.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const e = new Date(s); e.setDate(s.getDate() + 6); return [isoDate(s), isoDate(e)]; }
+    case 'month': return [isoDate(new Date(y, m, 1)), isoDate(new Date(y, m + 1, 0))];
+    case 'lastmonth': return [isoDate(new Date(y, m - 1, 1)), isoDate(new Date(y, m, 0))];
+    case 'year': return [`${y}-01-01`, `${y}-12-31`];
+    case 'custom': return [$('#r-from').value || '0000-00-00', $('#r-to').value || '9999-12-31'];
+    default: return ['0000-00-00', '9999-12-31'];
+  }
+}
+function reportEntries() {
+  const [from, to] = periodRange(), c = $('#r-client').value, p = $('#r-project').value;
+  return db.entries.filter(e => e.date >= from && e.date <= to && (!c || e.clientId === c) && (!p || e.projectId === p))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+}
+
+function renderReport() {
+  $$('.custom-range').forEach(el => el.style.display = $('#r-period').value === 'custom' ? '' : 'none');
+  const rc = $('#r-client'), rp = $('#r-project');
+  fillClientSelect(rc, {withAll: true, includeArchived: true, selected: rc.value});
+  fillProjectSelect(rp, rc.value, {withAll: true, includeArchived: true, selected: rp.value});
+
+  const list = reportEntries();
+  const [from, to] = periodRange();
+  const periodLabel = $('#r-period').selectedOptions[0].text + (from > '0000' ? ` (${from} → ${to})` : '');
+  $('#r-print-title').textContent = `Relevé de prestations — ${rc.value ? getClient(rc.value)?.name : 'tous clients'} — ${periodLabel}`;
+
+  // Synthèse
+  const groups = {};
+  list.forEach(e => { ((groups[e.clientId] ||= {})[e.projectId] ||= 0); groups[e.clientId][e.projectId] += e.minutes; });
+  const total = list.reduce((a, e) => a + e.minutes, 0);
+  const clientIds = Object.keys(groups).sort((a, b) => (getClient(a)?.name || '').localeCompare(getClient(b)?.name || '', 'fr'));
+  $('#r-summary').innerHTML = !list.length ? '<p class="muted">Aucune prestation pour ces filtres.</p>' : `
+    <table>
+      <thead><tr><th>Client / projet</th><th class="num">Période</th><th class="num">Heures déc.</th><th class="num">Vendu</th><th class="num">Consommé (total)</th><th class="num">Reste</th></tr></thead>
+      <tbody>
+      ${clientIds.map(cid => {
+        const projs = groups[cid], sub = Object.values(projs).reduce((a, b) => a + b, 0);
+        return `<tr class="client"><td>${esc(getClient(cid)?.name || '?')}</td><td class="num">${fmt(sub)}</td><td class="num">${fmtDec(sub)}</td><td></td><td></td><td></td></tr>` +
+          Object.entries(projs).sort((a, b) => (getProject(a[0])?.name || '').localeCompare(getProject(b[0])?.name || '', 'fr')).map(([pid, min]) => {
+            const p = getProject(pid), sold = p?.soldMinutes, used = usedMinutes(pid), over = sold && used > sold;
+            return `<tr><td style="padding-left:20px">${esc(p?.name || '?')}</td><td class="num">${fmt(min)}</td><td class="num">${fmtDec(min)}</td>
+              <td class="num">${sold ? fmt(sold) : '—'}</td>
+              <td class="num">${sold ? fmt(used) + `<div class="progress ${over ? 'over' : ''}"><div style="width:${Math.min(100, used / sold * 100)}%"></div></div>` : '—'}</td>
+              <td class="num ${over ? 'err' : ''}">${sold ? fmt(sold - used) : '—'}</td></tr>`;
+          }).join('');
+      }).join('')}
+      <tr class="total"><td>Total</td><td class="num">${fmt(total)}</td><td class="num">${fmtDec(total)}</td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>`;
+
+  // Détail
+  $('#r-detail').innerHTML = !list.length ? '<p class="muted">—</p>' : `
+    <table>
+      <thead><tr><th>Date</th><th>Client</th><th>Projet</th><th>Description</th><th class="num">Durée</th></tr></thead>
+      <tbody>${list.map(e => `<tr><td style="white-space:nowrap">${e.date}</td><td>${esc(getClient(e.clientId)?.name)}</td><td>${esc(getProject(e.projectId)?.name)}</td><td>${esc(e.description)}</td><td class="num">${fmt(e.minutes)}</td></tr>`).join('')}
+      <tr class="total"><td colspan="4">Total</td><td class="num">${fmt(total)}</td></tr></tbody>
+    </table>`;
+}
+
+function exportCSV() {
+  const list = reportEntries();
+  if (!list.length) return toast('Rien à exporter', true);
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [['Date', 'Client', 'Projet', 'Description', 'Durée (h:mm)', 'Heures (décimal)', 'Minutes']]
+    .concat(list.map(e => [e.date, getClient(e.clientId)?.name, getProject(e.projectId)?.name, e.description, fmt(e.minutes), fmtDec(e.minutes), e.minutes]));
+  const csv = '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n');
+  download(csv, `prestations_${periodRange().join('_').replace(/0000-00-00|9999-12-31/g, 'tout')}.csv`, 'text/csv;charset=utf-8');
+}
+function download(content, name, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/* ---------- Clients & projets ---------- */
+function renderManage() {
+  const showArch = $('#show-archived').checked;
+  const clients = db.clients.filter(c => showArch || !c.archived).sort(byName);
+  if (!clients.length) { $('#manage-list').innerHTML = '<div class="card muted">Aucun client pour l\'instant.</div>'; return; }
+  $('#manage-list').innerHTML = clients.map(c => {
+    const projs = db.projects.filter(p => p.clientId === c.id && (showArch || !p.archived)).sort(byName);
+    const hasEntries = db.entries.some(e => e.clientId === c.id);
+    return `<div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h3>${esc(c.name)} ${c.archived ? '<span class="tag">archivé</span>' : ''}</h3>
+        <div class="row">
+          <button class="btn ghost small" data-act="rename-client" data-id="${c.id}">Renommer</button>
+          <button class="btn ghost small" data-act="archive-client" data-id="${c.id}">${c.archived ? 'Désarchiver' : 'Archiver'}</button>
+          <button class="btn ghost small danger" data-act="del-client" data-id="${c.id}" ${hasEntries ? 'disabled title="Ce client a des prestations : archive-le plutôt"' : ''}>Supprimer</button>
+        </div>
+      </div>
+      ${projs.length ? `<table><thead><tr><th>Projet</th><th class="num">Vendu</th><th class="num">Consommé</th><th class="num">Reste</th><th></th></tr></thead><tbody>
+        ${projs.map(p => {
+          const used = usedMinutes(p.id), over = p.soldMinutes && used > p.soldMinutes, has = db.entries.some(e => e.projectId === p.id);
+          return `<tr><td>${esc(p.name)} ${p.archived ? '<span class="tag">archivé</span>' : ''}</td>
+            <td class="num">${p.soldMinutes ? fmt(p.soldMinutes) : '<span class="muted">régie</span>'}</td>
+            <td class="num">${fmt(used)}${p.soldMinutes ? `<div class="progress ${over ? 'over' : ''}"><div style="width:${Math.min(100, used / p.soldMinutes * 100)}%"></div></div>` : ''}</td>
+            <td class="num ${over ? 'err' : ''}">${p.soldMinutes ? fmt(p.soldMinutes - used) : '—'}</td>
+            <td class="num"><div class="row" style="justify-content:flex-end">
+              <button class="btn ghost small" data-act="edit-project" data-id="${p.id}">Modifier</button>
+              <button class="btn ghost small" data-act="archive-project" data-id="${p.id}">${p.archived ? 'Désarchiver' : 'Archiver'}</button>
+              <button class="btn ghost small danger" data-act="del-project" data-id="${p.id}" ${has ? 'disabled title="Ce projet a des prestations : archive-le plutôt"' : ''}>Suppr.</button>
+            </div></td></tr>`;
+        }).join('')}</tbody></table>` : '<p class="muted" style="margin:0 0 8px">Aucun projet.</p>'}
+      <form class="row add-project" data-client="${c.id}" style="margin-top:10px">
+        <input name="name" placeholder="Nouveau projet" style="flex:2;min-width:160px" required>
+        <input name="sold" placeholder="Temps vendu (ex. 20:00) — optionnel" style="flex:1;min-width:160px">
+        <button class="btn ghost" type="submit">Ajouter le projet</button>
+      </form>
+    </div>`;
+  }).join('');
+}
+
+function addClient(name) {
+  name = (name || '').trim(); if (!name) return null;
+  if (db.clients.some(c => c.name.toLowerCase() === name.toLowerCase())) { toast('Ce client existe déjà', true); return null; }
+  const c = {id: uid(), name, archived: false};
+  mutate('upsert', 'clients', c); return c;
+}
+function addProject(clientId, name, soldRaw) {
+  name = (name || '').trim(); if (!name || !clientId) return null;
+  let sold = null;
+  if (soldRaw && String(soldRaw).trim()) {
+    sold = parseDuration(soldRaw);
+    if (sold == null) { toast('Temps vendu non reconnu (ex. 20:00 ou 20)', true); return null; }
+  }
+  const p = {id: uid(), clientId, name, soldMinutes: sold || null, archived: false};
+  mutate('upsert', 'projects', p); return p;
+}
+
+/* ---------- Réglages ---------- */
+function renderSettings() {
+  $('#s-mode').value = cfg.mode; $('#s-url').value = cfg.url; $('#s-token').value = cfg.token;
+  toggleSheetsFields();
+}
+function toggleSheetsFields() { $$('.sheets-only').forEach(el => el.style.display = $('#s-mode').value === 'sheets' ? '' : 'none'); }
+
+/* ---------- Rendu global ---------- */
+function renderAll() {
+  renderForm(); renderEntryList();
+  if ($('#tab-report').classList.contains('active')) renderReport();
+  if ($('#tab-manage').classList.contains('active')) renderManage();
+  setSync(syncState.status, syncState.msg);
+}
+function showTab(name) {
+  $$('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  $$('main section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
+  if (name === 'report') renderReport();
+  if (name === 'manage') renderManage();
+  if (name === 'settings') renderSettings();
+}
+
+/* ---------- Événements ---------- */
+$$('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+$('#entry-form').onsubmit = saveEntry;
+$('#f-cancel').onclick = stopEdit;
+$('#f-client').onchange = () => { fillProjectSelect($('#f-project'), $('#f-client').value); refreshFormHints(); };
+$('#f-project').onchange = refreshFormHints;
+$('#f-dur').oninput = refreshFormHints;
+$$('.chips button').forEach(b => b.onclick = () => { $('#f-dur').value = fmt(+b.dataset.dur); refreshFormHints(); });
+$('#list-range').onchange = renderEntryList;
+
+$('#quick-client').onclick = () => {
+  const c = addClient(prompt('Nom du nouveau client :'));
+  if (c) { $('#f-client').value = ''; fillClientSelect($('#f-client'), {selected: c.id}); fillProjectSelect($('#f-project'), c.id); refreshFormHints(); toast('Client ajouté'); }
+};
+$('#quick-project').onclick = () => {
+  const cid = $('#f-client').value;
+  if (!cid) return toast('Choisis d\'abord un client', true);
+  const name = prompt(`Nouveau projet pour ${getClient(cid).name} :`); if (!name) return;
+  const sold = prompt('Temps vendu à l\'avance (ex. 20:00) — laisser vide si en régie :', '');
+  const p = addProject(cid, name, sold);
+  if (p) { fillProjectSelect($('#f-project'), cid, {selected: p.id}); refreshFormHints(); toast('Projet ajouté'); }
+};
+
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const id = b.dataset.id, act = b.dataset.act;
+  if (act === 'edit-entry') startEdit(id);
+  if (act === 'del-entry' && confirm('Supprimer cette prestation ?')) { if (editingId === id) stopEdit(); mutate('delete', 'entries', id); renderAll(); }
+  if (act === 'rename-client') {
+    const c = getClient(id), n = prompt('Nouveau nom :', c.name);
+    if (n && n.trim()) { mutate('upsert', 'clients', {...c, name: n.trim()}); renderAll(); }
+  }
+  if (act === 'archive-client') { const c = getClient(id); mutate('upsert', 'clients', {...c, archived: !c.archived}); renderAll(); }
+  if (act === 'del-client' && confirm('Supprimer ce client et ses projets ?')) {
+    db.projects.filter(p => p.clientId === id).forEach(p => mutate('delete', 'projects', p.id));
+    mutate('delete', 'clients', id); renderAll();
+  }
+  if (act === 'edit-project') {
+    const p = getProject(id);
+    const n = prompt('Nom du projet :', p.name); if (n == null) return;
+    const s = prompt('Temps vendu (ex. 20:00) — vide = régie :', p.soldMinutes ? fmt(p.soldMinutes) : ''); if (s == null) return;
+    let sold = null;
+    if (s.trim()) { sold = parseDuration(s); if (sold == null) return toast('Temps vendu non reconnu', true); }
+    mutate('upsert', 'projects', {...p, name: n.trim() || p.name, soldMinutes: sold || null}); renderAll();
+  }
+  if (act === 'archive-project') { const p = getProject(id); mutate('upsert', 'projects', {...p, archived: !p.archived}); renderAll(); }
+  if (act === 'del-project' && confirm('Supprimer ce projet ?')) { mutate('delete', 'projects', id); renderAll(); }
+});
+
+$('#add-client-form').onsubmit = ev => { ev.preventDefault(); if (addClient($('#new-client').value)) { $('#new-client').value = ''; renderAll(); toast('Client ajouté'); } };
+$('#show-archived').onchange = renderManage;
+$('#manage-list').addEventListener('submit', ev => {
+  const f = ev.target.closest('.add-project'); if (!f) return;
+  ev.preventDefault();
+  if (addProject(f.dataset.client, f.name.value, f.sold.value)) { renderAll(); toast('Projet ajouté'); }
+});
+
+['#r-period', '#r-from', '#r-to', '#r-project'].forEach(s => $(s).onchange = renderReport);
+$('#r-client').onchange = () => { $('#r-project').value = ''; renderReport(); };
+$('#r-csv').onclick = exportCSV;
+$('#r-print').onclick = () => window.print();
+
+$('#s-mode').onchange = toggleSheetsFields;
+$('#s-save').onclick = async () => {
+  const wasSheets = cfg.mode === 'sheets';
+  cfg = {mode: $('#s-mode').value, url: $('#s-url').value.trim(), token: $('#s-token').value.trim()};
+  if (cfg.mode === 'sheets' && (!cfg.url || !cfg.token)) return toast('URL et jeton requis', true);
+  localStorage.setItem(LS_CFG, JSON.stringify(cfg));
+  toast('Réglages enregistrés');
+  setSync('ok');
+  if (cfg.mode === 'sheets' && !wasSheets) {
+    if (confirm('Charger les données depuis le Sheet ?\n\nOK = charger le Sheet (remplace les données locales)\nAnnuler = garder les données locales (utilise ensuite « Envoyer les données locales »)')) remoteLoad();
+  }
+};
+$('#s-test').onclick = async () => {
+  const keep = cfg; cfg = {mode: 'sheets', url: $('#s-url').value.trim(), token: $('#s-token').value.trim()};
+  try { const j = await api({action: 'all'}); toast(`Connexion OK : ${j.data.clients.length} clients, ${j.data.entries.length} prestations`); }
+  catch (e) { toast('Échec : ' + e.message, true); }
+  finally { cfg = keep; }
+};
+$('#s-pull').onclick = () => remoteLoad();
+$('#s-push').onclick = async () => {
+  if (!confirm('Remplacer le contenu du Google Sheet par les données de ce navigateur ?')) return;
+  try { setSync('busy'); await api({action: 'replaceAll', data: db}); queue = []; saveQueue(); setSync('ok'); toast('Données envoyées'); }
+  catch (e) { setSync('error', e.message); toast('Échec : ' + e.message, true); }
+};
+$('#s-export').onclick = () => download(JSON.stringify(db, null, 2), `timetracker_${today()}.json`, 'application/json');
+$('#s-import').onchange = async ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  try {
+    const data = normalize(JSON.parse(await f.text()));
+    if (!confirm(`Importer ${data.clients.length} clients, ${data.projects.length} projets et ${data.entries.length} prestations ? Les données actuelles seront remplacées.`)) return;
+    db = data; persist();
+    if (cfg.mode === 'sheets') { queue = []; saveQueue(); await api({action: 'replaceAll', data: db}); }
+    renderAll(); toast('Import réussi');
+  } catch (e) { toast('Import impossible : ' + e.message, true); }
+  ev.target.value = '';
+};
+window.addEventListener('online', flush);
+
+/* ---------- Démarrage ---------- */
+cfg = {...cfg, ...readLS(LS_CFG, {})};
+db = normalize(readLS(LS_DATA, {}));
+queue = readLS(LS_QUEUE, []);
+renderAll();
+if (cfg.mode === 'sheets') remoteLoad(true);
+</script>
+</body>
+</html>
