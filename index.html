@@ -631,7 +631,8 @@ function renderReport() {
       }).join('')}
       <tr class="total"><td>Total</td><td class="num">${fmt(total)}</td><td class="num m-hide">${fmtDec(total)}</td><td class="m-hide"></td><td class="num">${money(grandAmt)}</td><td class="m-hide"></td><td></td></tr>
       </tbody>
-    </table></div>`;
+    </table></div>
+    <p class="hint">Sold / remaining cover the whole project, across all periods.</p>`;
 
   // To invoice (one line per project, as on a Peppol invoice)
   let tEx = 0, tVat = 0, missing = false;
