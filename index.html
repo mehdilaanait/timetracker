@@ -195,6 +195,7 @@ tr.client td{background:var(--soft);font-weight:700}
     <div class="print-head"><span id="print-logo"></span><span>Timesheet report</span></div>
     <div class="print-title" id="r-print-title"></div>
     <div class="card"><h2>Summary by project</h2><div id="r-summary"></div></div>
+    <div class="card"><h2>To invoice</h2><div id="r-invoice"></div></div>
     <div class="card"><h2>Details</h2><div id="r-detail"></div></div>
   </section>
 
@@ -203,7 +204,8 @@ tr.client td{background:var(--soft);font-weight:700}
     <div class="card">
       <h2>Add a client</h2>
       <form class="row" id="add-client-form">
-        <input id="new-client" placeholder="Client name" style="flex:1;min-width:200px" required>
+        <input id="new-client" placeholder="Client name" style="flex:2;min-width:200px" required>
+        <input id="new-client-rate" placeholder="Hourly rate € (excl. VAT)" style="flex:1;min-width:160px" inputmode="decimal">
         <button class="btn" type="submit">Add</button>
       </form>
       <label class="row" style="margin-top:12px;font-weight:400;color:var(--ink)">
@@ -300,13 +302,25 @@ function normalize(d) {
   const b = v => v === true || v === 'true' || v === 'TRUE';
   const n = v => (v === '' || v == null || isNaN(Number(v))) ? null : Number(v);
   return {
-    clients: (d.clients || []).filter(c => c.id).map(c => ({id: String(c.id), name: String(c.name || ''), archived: b(c.archived)})),
-    projects: (d.projects || []).filter(p => p.id).map(p => ({id: String(p.id), clientId: String(p.clientId), name: String(p.name || ''), soldMinutes: n(p.soldMinutes), archived: b(p.archived)})),
+    clients: (d.clients || []).filter(c => c.id).map(c => ({id: String(c.id), name: String(c.name || ''), rate: n(c.rate), vat: n(c.vat) ?? 21, archived: b(c.archived)})),
+    projects: (d.projects || []).filter(p => p.id).map(p => ({id: String(p.id), clientId: String(p.clientId), name: String(p.name || ''), soldMinutes: n(p.soldMinutes), rate: n(p.rate), archived: b(p.archived)})),
     entries: (d.entries || []).filter(e => e.id).map(e => ({id: String(e.id), date: String(e.date).slice(0, 10), clientId: String(e.clientId), projectId: String(e.projectId), description: String(e.description || ''), minutes: Number(e.minutes) || 0, createdAt: String(e.createdAt || '')}))
   };
 }
 
 const getClient = id => db.clients.find(c => c.id === id);
+const money = v => new Intl.NumberFormat('en-IE', {style: 'currency', currency: 'EUR'}).format(v || 0);
+const moneyCsv = v => v == null ? '' : v.toFixed(2).replace('.', ',');
+const parseNum = v => { v = String(v ?? '').trim().replace(',', '.').replace(/[€\s]/g, ''); return v === '' ? null : (isNaN(Number(v)) ? NaN : Number(v)); };
+const round2 = v => Math.round(v * 100) / 100;
+/** Project rate overrides client rate */
+function rateFor(projectId) {
+  const p = getProject(projectId); if (!p) return null;
+  if (p.rate != null) return p.rate;
+  return getClient(p.clientId)?.rate ?? null;
+}
+const amountFor = (minutes, rate) => rate == null ? null : round2(minutes / 60 * rate);
+let editingClientId = null, editingProjectId = null;
 const getProject = id => db.projects.find(p => p.id === id);
 const usedMinutes = (pid, excludeId) => db.entries.filter(e => e.projectId === pid && e.id !== excludeId).reduce((a, e) => a + e.minutes, 0);
 
@@ -530,32 +544,56 @@ function renderReport() {
   const groups = {};
   list.forEach(e => { ((groups[e.clientId] ||= {})[e.projectId] ||= 0); groups[e.clientId][e.projectId] += e.minutes; });
   const total = list.reduce((a, e) => a + e.minutes, 0);
+  const grandAmt = Object.values(groups).reduce((a, projs) => a + Object.entries(projs).reduce((b, [pid, min]) => b + (amountFor(min, rateFor(pid)) ?? 0), 0), 0);
   const clientIds = Object.keys(groups).sort((a, b) => (getClient(a)?.name || '').localeCompare(getClient(b)?.name || '', 'fr'));
   $('#r-summary').innerHTML = !list.length ? '<p class="muted">No entries for these filters.</p>' : `
     <table>
-      <thead><tr><th>Client / project</th><th class="num">Period</th><th class="num">Decimal hrs</th><th class="num">Sold</th><th class="num">Used (all time)</th><th class="num">Remaining</th></tr></thead>
+      <thead><tr><th>Client / project</th><th class="num">Period</th><th class="num">Decimal hrs</th><th class="num">Rate</th><th class="num">Amount excl. VAT</th><th class="num">Sold</th><th class="num">Used (all time)</th><th class="num">Remaining</th></tr></thead>
       <tbody>
       ${clientIds.map(cid => {
         const projs = groups[cid], sub = Object.values(projs).reduce((a, b) => a + b, 0);
-        return `<tr class="client"><td>${esc(getClient(cid)?.name || '?')}</td><td class="num">${fmt(sub)}</td><td class="num">${fmtDec(sub)}</td><td></td><td></td><td></td></tr>` +
+        const subAmt = Object.entries(projs).reduce((a, [pid, min]) => a + (amountFor(min, rateFor(pid)) ?? 0), 0);
+        return `<tr class="client"><td>${esc(getClient(cid)?.name || '?')}</td><td class="num">${fmt(sub)}</td><td class="num">${fmtDec(sub)}</td><td></td><td class="num">${money(subAmt)}</td><td></td><td></td><td></td></tr>` +
           Object.entries(projs).sort((a, b) => (getProject(a[0])?.name || '').localeCompare(getProject(b[0])?.name || '', 'fr')).map(([pid, min]) => {
             const p = getProject(pid), sold = p?.soldMinutes, used = usedMinutes(pid), over = sold && used > sold;
+            const rate = rateFor(pid), amt = amountFor(min, rate);
             return `<tr><td style="padding-left:20px">${esc(p?.name || '?')}</td><td class="num">${fmt(min)}</td><td class="num">${fmtDec(min)}</td>
+              <td class="num">${rate == null ? '<span class="err">no rate</span>' : money(rate)}</td><td class="num">${amt == null ? '—' : money(amt)}</td>
               <td class="num">${sold ? fmt(sold) : '—'}</td>
               <td class="num">${sold ? fmt(used) + `<div class="progress ${over ? 'over' : ''}"><div style="width:${Math.min(100, used / sold * 100)}%"></div></div>` : '—'}</td>
               <td class="num ${over ? 'err' : ''}">${sold ? fmt(sold - used) : '—'}</td></tr>`;
           }).join('');
       }).join('')}
-      <tr class="total"><td>Total</td><td class="num">${fmt(total)}</td><td class="num">${fmtDec(total)}</td><td></td><td></td><td></td></tr>
+      <tr class="total"><td>Total</td><td class="num">${fmt(total)}</td><td class="num">${fmtDec(total)}</td><td></td><td class="num">${money(grandAmt)}</td><td></td><td></td><td></td></tr>
       </tbody>
+    </table>`;
+
+  // To invoice (one line per project, as on a Peppol invoice)
+  let tEx = 0, tVat = 0, missing = false;
+  const invRows = clientIds.map(cid => {
+    const c = getClient(cid), projs = groups[cid];
+    const lines = Object.entries(projs).map(([pid, min]) => ({p: getProject(pid), min, rate: rateFor(pid), amt: amountFor(min, rateFor(pid))}));
+    if (lines.some(l => l.rate == null)) missing = true;
+    const ex = round2(lines.reduce((a, l) => a + (l.amt ?? 0), 0));
+    const vatRate = c?.vat ?? 21, vat = round2(ex * vatRate / 100);
+    tEx += ex; tVat += vat;
+    return `<tr class="client"><td>${esc(c?.name || '?')}</td><td class="num">${fmt(lines.reduce((a, l) => a + l.min, 0))}</td><td></td><td class="num">${money(ex)}</td><td class="num">${vatRate}%</td><td class="num">${money(vat)}</td><td class="num">${money(ex + vat)}</td></tr>` +
+      lines.map(l => `<tr><td style="padding-left:20px">${esc(l.p?.name || '?')}</td><td class="num">${fmtDec(l.min)} h</td><td class="num">${l.rate == null ? '<span class="err">no rate</span>' : money(l.rate)}</td><td class="num">${l.amt == null ? '—' : money(l.amt)}</td><td></td><td></td><td></td></tr>`).join('');
+  }).join('');
+  $('#r-invoice').innerHTML = !list.length ? '<p class="muted">—</p>' : `
+    ${missing ? '<p class="err" style="margin-top:0">Some projects have no hourly rate: set it in Clients &amp; projects → Edit.</p>' : ''}
+    <table>
+      <thead><tr><th>Client / invoice line</th><th class="num">Quantity</th><th class="num">Unit price</th><th class="num">Excl. VAT</th><th class="num">VAT %</th><th class="num">VAT</th><th class="num">Incl. VAT</th></tr></thead>
+      <tbody>${invRows}
+      <tr class="total"><td>Total</td><td></td><td></td><td class="num">${money(tEx)}</td><td></td><td class="num">${money(tVat)}</td><td class="num">${money(tEx + tVat)}</td></tr></tbody>
     </table>`;
 
   // Details
   $('#r-detail').innerHTML = !list.length ? '<p class="muted">—</p>' : `
     <table>
-      <thead><tr><th>Date</th><th>Client</th><th>Project</th><th>Description</th><th class="num">Duration</th></tr></thead>
-      <tbody>${list.map(e => `<tr><td style="white-space:nowrap">${e.date}</td><td>${esc(getClient(e.clientId)?.name)}</td><td>${esc(getProject(e.projectId)?.name)}</td><td>${esc(e.description)}</td><td class="num">${fmt(e.minutes)}</td></tr>`).join('')}
-      <tr class="total"><td colspan="4">Total</td><td class="num">${fmt(total)}</td></tr></tbody>
+      <thead><tr><th>Date</th><th>Client</th><th>Project</th><th>Description</th><th class="num">Duration</th><th class="num">Amount</th></tr></thead>
+      <tbody>${list.map(e => { const a = amountFor(e.minutes, rateFor(e.projectId)); return `<tr><td style="white-space:nowrap">${e.date}</td><td>${esc(getClient(e.clientId)?.name)}</td><td>${esc(getProject(e.projectId)?.name)}</td><td>${esc(e.description)}</td><td class="num">${fmt(e.minutes)}</td><td class="num">${a == null ? '—' : money(a)}</td></tr>`; }).join('')}
+      <tr class="total"><td colspan="4">Total</td><td class="num">${fmt(total)}</td><td class="num">${money(grandAmt)}</td></tr></tbody>
     </table>`;
 }
 
@@ -563,8 +601,8 @@ function exportCSV() {
   const list = reportEntries();
   if (!list.length) return toast('Nothing to export', true);
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['Date', 'Client', 'Project', 'Description', 'Duration (h:mm)', 'Hours (decimal)', 'Minutes']]
-    .concat(list.map(e => [e.date, getClient(e.clientId)?.name, getProject(e.projectId)?.name, e.description, fmt(e.minutes), fmtDec(e.minutes).replace('.', ','), e.minutes]));
+  const rows = [['Date', 'Client', 'Project', 'Description', 'Duration (h:mm)', 'Hours (decimal)', 'Minutes', 'Rate', 'Amount excl. VAT']]
+    .concat(list.map(e => [e.date, getClient(e.clientId)?.name, getProject(e.projectId)?.name, e.description, fmt(e.minutes), fmtDec(e.minutes).replace('.', ','), e.minutes, moneyCsv(rateFor(e.projectId)), moneyCsv(amountFor(e.minutes, rateFor(e.projectId)))]));
   const csv = '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n');
   download(csv, `timesheet_${periodRange().join('_').replace(/0000-00-00|9999-12-31/g, 'all')}.csv`, 'text/csv;charset=utf-8');
 }
@@ -585,17 +623,33 @@ function renderManage() {
     const hasEntries = db.entries.some(e => e.clientId === c.id);
     return `<div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:10px">
-        <h3>${esc(c.name)} ${c.archived ? '<span class="tag">archived</span>' : ''}</h3>
+        <div><h3>${esc(c.name)} ${c.archived ? '<span class="tag">archived</span>' : ''}</h3>
+          <div class="hint" style="margin:2px 0 0">${c.rate != null ? money(c.rate) + ' / h' : '<span class="err">No hourly rate</span>'} · VAT ${c.vat}%</div></div>
         <div class="row">
-          <button class="btn ghost small" data-act="rename-client" data-id="${c.id}">Rename</button>
+          <button class="btn ghost small" data-act="edit-client" data-id="${c.id}">Edit</button>
           <button class="btn ghost small" data-act="archive-client" data-id="${c.id}">${c.archived ? 'Unarchive' : 'Archive'}</button>
           <button class="btn ghost small danger" data-act="del-client" data-id="${c.id}" ${hasEntries ? 'disabled title="This client has entries: archive it instead"' : ''}>Delete</button>
         </div>
       </div>
-      ${projs.length ? `<table><thead><tr><th>Project</th><th class="num">Sold</th><th class="num">Used</th><th class="num">Remaining</th><th></th></tr></thead><tbody>
+      ${editingClientId === c.id ? `
+      <form class="edit-client grid" data-id="${c.id}" style="background:var(--soft);padding:12px;border-radius:8px;margin-bottom:12px">
+        <div><label>Client name</label><input name="name" value="${esc(c.name)}" required></div>
+        <div><label>Hourly rate (€, excl. VAT)</label><input name="rate" value="${c.rate ?? ''}" placeholder="e.g. 95" inputmode="decimal"></div>
+        <div><label>VAT %</label><input name="vat" value="${c.vat}" inputmode="decimal"><div class="hint">21 = Belgium · 0 = reverse charge / export</div></div>
+        <div class="row" style="align-self:end"><button class="btn" type="submit">Save</button><button class="btn ghost" type="button" data-act="cancel-edit">Cancel</button></div>
+      </form>` : ''}
+      ${projs.length ? `<table><thead><tr><th>Project</th><th class="num">Rate</th><th class="num">Sold</th><th class="num">Used</th><th class="num">Remaining</th><th></th></tr></thead><tbody>
         ${projs.map(p => {
           const used = usedMinutes(p.id), over = p.soldMinutes && used > p.soldMinutes, has = db.entries.some(e => e.projectId === p.id);
+          if (editingProjectId === p.id) return `<tr><td colspan="6">
+            <form class="edit-project grid" data-id="${p.id}" style="background:var(--soft);padding:12px;border-radius:8px">
+              <div><label>Project name</label><input name="name" value="${esc(p.name)}" required></div>
+              <div><label>Pre-sold time (empty = T&amp;M)</label><input name="sold" value="${p.soldMinutes ? fmt(p.soldMinutes) : ''}" placeholder="e.g. 80:00"></div>
+              <div><label>Hourly rate override (€)</label><input name="rate" value="${p.rate ?? ''}" placeholder="${c.rate != null ? 'Client rate: ' + c.rate : 'e.g. 95'}" inputmode="decimal"></div>
+              <div class="row" style="align-self:end"><button class="btn" type="submit">Save</button><button class="btn ghost" type="button" data-act="cancel-edit">Cancel</button></div>
+            </form></td></tr>`;
           return `<tr><td>${esc(p.name)} ${p.archived ? '<span class="tag">archived</span>' : ''}</td>
+            <td class="num">${rateFor(p.id) == null ? '—' : money(rateFor(p.id)) + (p.rate != null ? ' <span class="tag">project</span>' : '')}</td>
             <td class="num">${p.soldMinutes ? fmt(p.soldMinutes) : '<span class="muted">T&amp;M</span>'}</td>
             <td class="num">${fmt(used)}${p.soldMinutes ? `<div class="progress ${over ? 'over' : ''}"><div style="width:${Math.min(100, used / p.soldMinutes * 100)}%"></div></div>` : ''}</td>
             <td class="num ${over ? 'err' : ''}">${p.soldMinutes ? fmt(p.soldMinutes - used) : '—'}</td>
@@ -614,10 +668,12 @@ function renderManage() {
   }).join('');
 }
 
-function addClient(name) {
+function addClient(name, rateRaw) {
   name = (name || '').trim(); if (!name) return null;
   if (db.clients.some(c => c.name.toLowerCase() === name.toLowerCase())) { toast('This client already exists', true); return null; }
-  const c = {id: uid(), name, archived: false};
+  const rate = parseNum(rateRaw);
+  if (Number.isNaN(rate)) { toast('Unrecognised hourly rate', true); return null; }
+  const c = {id: uid(), name, rate, vat: 21, archived: false};
   mutate('upsert', 'clients', c); return c;
 }
 function addProject(clientId, name, soldRaw) {
@@ -627,7 +683,7 @@ function addProject(clientId, name, soldRaw) {
     sold = parseDuration(soldRaw);
     if (sold == null) { toast('Unrecognised pre-sold time (e.g. 20:00 or 20)', true); return null; }
   }
-  const p = {id: uid(), clientId, name, soldMinutes: sold || null, archived: false};
+  const p = {id: uid(), clientId, name, soldMinutes: sold || null, rate: null, archived: false};
   mutate('upsert', 'projects', p); return p;
 }
 
@@ -683,30 +739,38 @@ document.addEventListener('click', ev => {
   const id = b.dataset.id, act = b.dataset.act;
   if (act === 'edit-entry') startEdit(id);
   if (act === 'del-entry' && confirm('Delete this entry?')) { if (editingId === id) stopEdit(); mutate('delete', 'entries', id); renderAll(); }
-  if (act === 'rename-client') {
-    const c = getClient(id), n = prompt('New name:', c.name);
-    if (n && n.trim()) { mutate('upsert', 'clients', {...c, name: n.trim()}); renderAll(); }
-  }
+  if (act === 'edit-client') { editingClientId = id; editingProjectId = null; renderManage(); }
+  if (act === 'cancel-edit') { editingClientId = editingProjectId = null; renderManage(); }
   if (act === 'archive-client') { const c = getClient(id); mutate('upsert', 'clients', {...c, archived: !c.archived}); renderAll(); }
   if (act === 'del-client' && confirm('Delete this client and its projects?')) {
     db.projects.filter(p => p.clientId === id).forEach(p => mutate('delete', 'projects', p.id));
     mutate('delete', 'clients', id); renderAll();
   }
-  if (act === 'edit-project') {
-    const p = getProject(id);
-    const n = prompt('Project name:', p.name); if (n == null) return;
-    const s = prompt('Pre-sold time (e.g. 20:00) — empty = time & materials:', p.soldMinutes ? fmt(p.soldMinutes) : ''); if (s == null) return;
-    let sold = null;
-    if (s.trim()) { sold = parseDuration(s); if (sold == null) return toast('Unrecognised pre-sold time', true); }
-    mutate('upsert', 'projects', {...p, name: n.trim() || p.name, soldMinutes: sold || null}); renderAll();
-  }
+  if (act === 'edit-project') { editingProjectId = id; editingClientId = null; renderManage(); }
   if (act === 'archive-project') { const p = getProject(id); mutate('upsert', 'projects', {...p, archived: !p.archived}); renderAll(); }
   if (act === 'del-project' && confirm('Delete this project?')) { mutate('delete', 'projects', id); renderAll(); }
 });
 
-$('#add-client-form').onsubmit = ev => { ev.preventDefault(); if (addClient($('#new-client').value)) { $('#new-client').value = ''; renderAll(); toast('Client added'); } };
+$('#add-client-form').onsubmit = ev => { ev.preventDefault(); if (addClient($('#new-client').value, $('#new-client-rate').value)) { $('#new-client').value = ''; $('#new-client-rate').value = ''; renderAll(); toast('Client added'); } };
 $('#show-archived').onchange = renderManage;
 $('#manage-list').addEventListener('submit', ev => {
+  const ec = ev.target.closest('.edit-client'), ep = ev.target.closest('.edit-project');
+  if (ec) {
+    ev.preventDefault();
+    const c = getClient(ec.dataset.id), name = ec.name.value.trim(), rate = parseNum(ec.rate.value), vat = parseNum(ec.vat.value);
+    if (!name) return toast('Name required', true);
+    if (Number.isNaN(rate)) return toast('Unrecognised hourly rate', true);
+    if (vat == null || Number.isNaN(vat)) return toast('Unrecognised VAT %', true);
+    mutate('upsert', 'clients', {...c, name, rate, vat}); editingClientId = null; renderAll(); renderManage(); return toast('Client saved');
+  }
+  if (ep) {
+    ev.preventDefault();
+    const p = getProject(ep.dataset.id), name = ep.name.value.trim(), rate = parseNum(ep.rate.value);
+    let sold = null;
+    if (ep.sold.value.trim()) { sold = parseDuration(ep.sold.value); if (sold == null) return toast('Unrecognised pre-sold time', true); }
+    if (Number.isNaN(rate)) return toast('Unrecognised hourly rate', true);
+    mutate('upsert', 'projects', {...p, name: name || p.name, soldMinutes: sold || null, rate}); editingProjectId = null; renderAll(); renderManage(); return toast('Project saved');
+  }
   const f = ev.target.closest('.add-project'); if (!f) return;
   ev.preventDefault();
   if (addProject(f.dataset.client, f.name.value, f.sold.value)) { renderAll(); toast('Project added'); }
