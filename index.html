@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Timetracker">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Timetracker</title>
 <style>
 :root{--bg:#f6f6f5;--card:#fff;--ink:#1a1a1a;--muted:#6b6b6b;--line:#e2e2e0;--soft:#efefed;--warn:#b42318}
@@ -66,6 +71,34 @@ tr.client td{background:var(--soft);font-weight:700}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 #toast.show{opacity:1}#toast.bad{background:var(--warn)}
 .print-title{display:none}
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.m-only,.m-only-b{display:none}
+.plist{border-top:1px solid var(--line)}
+.pitem{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.pinfo{flex:1;min-width:0}
+.pact{flex-shrink:0}
+@media (max-width:700px){
+  .m-hide{display:none}
+  .d-only{display:none}.m-only{display:inline}.m-only-b{display:block}
+  body{font-size:15px}
+  input,select,textarea{font-size:16px} /* prevents iOS zoom on focus */
+  .bar{padding:8px 12px calc(8px) 12px;gap:8px}
+  .brand{gap:8px;font-size:15px}.logo{height:28px}.brand .sep{height:22px}
+  .sync{margin-left:auto;font-size:11px;order:2}
+  nav{order:3;width:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+  nav button{padding:9px 4px;font-size:14px;text-align:center}
+  main{padding:10px}
+  .card{padding:14px;border-radius:10px;margin-bottom:12px}
+  th,td{padding:6px 5px}
+  .pitem{flex-direction:column;align-items:stretch}
+  .pact{justify-content:flex-start}
+  .btn.small{padding:6px 10px;font-size:13px}
+  .entry{flex-wrap:wrap}
+  .entry .what{flex-basis:100%}
+  .entry .dur{text-align:left;min-width:0;margin-right:auto}
+  #r-summary td:first-child,#r-invoice td:first-child{min-width:110px}
+  .progress{min-width:40px}
+}
 @media print{.print-head{display:flex!important}}
 #pdf-report{display:none}
 @media print{
@@ -116,7 +149,7 @@ tr.client td{background:var(--soft);font-weight:700}
     <nav>
       <button data-tab="entry" class="active">Log time</button>
       <button data-tab="report">Reports</button>
-      <button data-tab="manage">Clients &amp; projects</button>
+      <button data-tab="manage"><span class="d-only">Clients &amp; projects</span><span class="m-only">Clients</span></button>
       <button data-tab="settings">Settings</button>
     </nav>
     <span class="sync" id="sync"></span>
@@ -258,6 +291,18 @@ tr.client td{background:var(--soft);font-weight:700}
         <button class="btn ghost sheets-only" id="s-pull">Reload from Sheet</button>
         <button class="btn ghost sheets-only" id="s-push">Push local data to Sheet</button>
       </div>
+    </div>
+    <div class="card">
+      <h2>Import history (CSV)</h2>
+      <p class="hint" style="margin-top:0">Expected columns: Date, Client, Project, Notes/Description, Hours (e.g. <code>3,5</code> or <code>3.50</code>). In Google Sheets: File → Download → CSV (exports the current tab).</p>
+      <div class="grid">
+        <div class="full"><label>CSV file</label><input type="file" id="i-file" accept=".csv,text/csv"></div>
+        <div><label for="i-from">Only from (optional)</label><input type="date" id="i-from"></div>
+        <div><label for="i-to">Only until (optional)</label><input type="date" id="i-to"></div>
+      </div>
+      <label class="row" style="margin-top:10px;font-weight:400;color:var(--ink)"><input type="checkbox" id="i-dedup" checked style="width:auto"> Skip entries that already exist (same date, client, description and duration)</label>
+      <label class="row" style="font-weight:400;color:var(--ink)"><input type="checkbox" id="i-archive" checked style="width:auto"> Archive newly created clients/projects with no entries in the last 12 months</label>
+      <div id="i-preview" style="margin-top:12px"></div>
     </div>
     <div class="card">
       <h2>Backup</h2>
@@ -568,26 +613,25 @@ function renderReport() {
   const grandAmt = Object.values(groups).reduce((a, projs) => a + Object.entries(projs).reduce((b, [pid, min]) => b + (amountFor(min, rateFor(pid)) ?? 0), 0), 0);
   const clientIds = Object.keys(groups).sort((a, b) => (getClient(a)?.name || '').localeCompare(getClient(b)?.name || '', 'fr'));
   $('#r-summary').innerHTML = !list.length ? '<p class="muted">No entries for these filters.</p>' : `
-    <table>
-      <thead><tr><th>Client / project</th><th class="num">Period</th><th class="num">Decimal hrs</th><th class="num">Rate</th><th class="num">Amount excl. VAT</th><th class="num">Sold</th><th class="num">Used (all time)</th><th class="num">Remaining</th></tr></thead>
+    <div class="tbl"><table>
+      <thead><tr><th>Client / project</th><th class="num">Period</th><th class="num m-hide">Decimal hrs</th><th class="num m-hide">Rate</th><th class="num"><span class="d-only">Amount excl. VAT</span><span class="m-only">Excl. VAT</span></th><th class="num m-hide">Sold</th><th class="num"><span class="d-only">Remaining</span><span class="m-only">Left</span></th></tr></thead>
       <tbody>
       ${clientIds.map(cid => {
         const projs = groups[cid], sub = Object.values(projs).reduce((a, b) => a + b, 0);
         const subAmt = Object.entries(projs).reduce((a, [pid, min]) => a + (amountFor(min, rateFor(pid)) ?? 0), 0);
-        return `<tr class="client"><td>${esc(getClient(cid)?.name || '?')}</td><td class="num">${fmt(sub)}</td><td class="num">${fmtDec(sub)}</td><td></td><td class="num">${money(subAmt)}</td><td></td><td></td><td></td></tr>` +
+        return `<tr class="client"><td>${esc(getClient(cid)?.name || '?')}</td><td class="num">${fmt(sub)}</td><td class="num m-hide">${fmtDec(sub)}</td><td class="m-hide"></td><td class="num">${money(subAmt)}</td><td class="m-hide"></td><td></td></tr>` +
           Object.entries(projs).sort((a, b) => (getProject(a[0])?.name || '').localeCompare(getProject(b[0])?.name || '', 'fr')).map(([pid, min]) => {
             const p = getProject(pid), sold = p?.soldMinutes, used = usedMinutes(pid), over = sold && used > sold;
             const rate = rateFor(pid), amt = amountFor(min, rate);
-            return `<tr><td style="padding-left:20px">${esc(p?.name || '?')}</td><td class="num">${fmt(min)}</td><td class="num">${fmtDec(min)}</td>
-              <td class="num">${rate == null ? '<span class="err">no rate</span>' : money(rate)}</td><td class="num">${amt == null ? '—' : money(amt)}</td>
-              <td class="num">${sold ? fmt(sold) : '—'}</td>
-              <td class="num">${sold ? fmt(used) + `<div class="progress ${over ? 'over' : ''}"><div style="width:${Math.min(100, used / sold * 100)}%"></div></div>` : '—'}</td>
-              <td class="num ${over ? 'err' : ''}">${sold ? fmt(sold - used) : '—'}</td></tr>`;
+            return `<tr><td style="padding-left:20px">${esc(p?.name || '?')}</td><td class="num">${fmt(min)}</td><td class="num m-hide">${fmtDec(min)}</td>
+              <td class="num m-hide">${rate == null ? '<span class="err">no rate</span>' : money(rate)}</td><td class="num">${amt == null ? '—' : money(amt)}</td>
+              <td class="num m-hide">${sold ? fmt(sold) : '—'}</td>
+              <td class="num ${over ? 'err' : ''}">${sold ? fmt(sold - used) + `<div class="progress ${over ? 'over' : ''}"><div style="width:${Math.min(100, used / sold * 100)}%"></div></div>` : '—'}</td></tr>`;
           }).join('');
       }).join('')}
-      <tr class="total"><td>Total</td><td class="num">${fmt(total)}</td><td class="num">${fmtDec(total)}</td><td></td><td class="num">${money(grandAmt)}</td><td></td><td></td><td></td></tr>
+      <tr class="total"><td>Total</td><td class="num">${fmt(total)}</td><td class="num m-hide">${fmtDec(total)}</td><td class="m-hide"></td><td class="num">${money(grandAmt)}</td><td class="m-hide"></td><td></td></tr>
       </tbody>
-    </table>`;
+    </table></div>`;
 
   // To invoice (one line per project, as on a Peppol invoice)
   let tEx = 0, tVat = 0, missing = false;
@@ -598,24 +642,24 @@ function renderReport() {
     const ex = round2(lines.reduce((a, l) => a + (l.amt ?? 0), 0));
     const vatRate = c?.vat ?? 21, vat = round2(ex * vatRate / 100);
     tEx += ex; tVat += vat;
-    return `<tr class="client"><td>${esc(c?.name || '?')}</td><td class="num">${fmt(lines.reduce((a, l) => a + l.min, 0))}</td><td></td><td class="num">${money(ex)}</td><td class="num">${vatRate}%</td><td class="num">${money(vat)}</td><td class="num">${money(ex + vat)}</td></tr>` +
-      lines.map(l => `<tr><td style="padding-left:20px">${esc(l.p?.name || '?')}</td><td class="num">${fmtDec(l.min)} h</td><td class="num">${l.rate == null ? '<span class="err">no rate</span>' : money(l.rate)}</td><td class="num">${l.amt == null ? '—' : money(l.amt)}</td><td></td><td></td><td></td></tr>`).join('');
+    return `<tr class="client"><td>${esc(c?.name || '?')}</td><td class="num">${fmt(lines.reduce((a, l) => a + l.min, 0))}</td><td class="m-hide"></td><td class="num">${money(ex)}</td><td class="num m-hide">${vatRate}%</td><td class="num m-hide">${money(vat)}</td><td class="num">${money(ex + vat)}</td></tr>` +
+      lines.map(l => `<tr><td style="padding-left:20px">${esc(l.p?.name || '?')}</td><td class="num">${fmtDec(l.min)} h</td><td class="num m-hide">${l.rate == null ? '<span class="err">no rate</span>' : money(l.rate)}</td><td class="num">${l.amt == null ? '—' : money(l.amt)}</td><td class="m-hide"></td><td class="m-hide"></td><td></td></tr>`).join('');
   }).join('');
   $('#r-invoice').innerHTML = !list.length ? '<p class="muted">—</p>' : `
     ${missing ? '<p class="err" style="margin-top:0">Some projects have no hourly rate: set it in Clients &amp; projects → Edit.</p>' : ''}
-    <table>
-      <thead><tr><th>Client / invoice line</th><th class="num">Quantity</th><th class="num">Unit price</th><th class="num">Excl. VAT</th><th class="num">VAT %</th><th class="num">VAT</th><th class="num">Incl. VAT</th></tr></thead>
+    <div class="tbl"><table>
+      <thead><tr><th>Client / invoice line</th><th class="num">Quantity</th><th class="num m-hide">Unit price</th><th class="num">Excl. VAT</th><th class="num m-hide">VAT %</th><th class="num m-hide">VAT</th><th class="num">Incl. VAT</th></tr></thead>
       <tbody>${invRows}
-      <tr class="total"><td>Total</td><td></td><td></td><td class="num">${money(tEx)}</td><td></td><td class="num">${money(tVat)}</td><td class="num">${money(tEx + tVat)}</td></tr></tbody>
-    </table>`;
+      <tr class="total"><td>Total</td><td></td><td class="m-hide"></td><td class="num">${money(tEx)}</td><td class="m-hide"></td><td class="num m-hide">${money(tVat)}</td><td class="num">${money(tEx + tVat)}</td></tr></tbody>
+    </table></div>`;
 
   // Details
   $('#r-detail').innerHTML = !list.length ? '<p class="muted">—</p>' : `
-    <table>
-      <thead><tr><th>Date</th><th>Client</th><th>Project</th><th>Description</th><th class="num">Duration</th><th class="num">Amount</th></tr></thead>
-      <tbody>${list.map(e => { const a = amountFor(e.minutes, rateFor(e.projectId)); return `<tr><td style="white-space:nowrap">${e.date}</td><td>${esc(getClient(e.clientId)?.name)}</td><td>${esc(getProject(e.projectId)?.name)}</td><td>${esc(e.description)}</td><td class="num">${fmt(e.minutes)}</td><td class="num">${a == null ? '—' : money(a)}</td></tr>`; }).join('')}
-      <tr class="total"><td colspan="4">Total</td><td class="num">${fmt(total)}</td><td class="num">${money(grandAmt)}</td></tr></tbody>
-    </table>`;
+    <div class="tbl"><table>
+      <thead><tr><th>Date</th><th class="m-hide">Client</th><th class="m-hide">Project</th><th>Description</th><th class="num">Duration</th><th class="num">Amount</th></tr></thead>
+      <tbody>${list.map(e => { const a = amountFor(e.minutes, rateFor(e.projectId)); return `<tr><td style="white-space:nowrap">${e.date}</td><td class="m-hide">${esc(getClient(e.clientId)?.name)}</td><td class="m-hide">${esc(getProject(e.projectId)?.name)}</td><td>${esc(e.description)}<div class="hint m-only-b">${esc(getClient(e.clientId)?.name)} · ${esc(getProject(e.projectId)?.name)}</div></td><td class="num">${fmt(e.minutes)}</td><td class="num">${a == null ? '—' : money(a)}</td></tr>`; }).join('')}
+      <tr class="total"><td>Total</td><td class="m-hide"></td><td class="m-hide"></td><td></td><td class="num">${fmt(total)}</td><td class="num">${money(grandAmt)}</td></tr></tbody>
+    </table></div>`;
 }
 
 function exportCSV() {
@@ -659,30 +703,33 @@ function renderManage() {
         <div><label>VAT %</label><input name="vat" value="${c.vat}" inputmode="decimal"><div class="hint">21 = Belgium · 0 = reverse charge / export</div></div>
         <div class="row" style="align-self:end"><button class="btn" type="submit">Save</button><button class="btn ghost" type="button" data-act="cancel-edit">Cancel</button></div>
       </form>` : ''}
-      ${projs.length ? `<table><thead><tr><th>Project</th><th class="num">Rate</th><th class="num">Sold</th><th class="num">Used</th><th class="num">Remaining</th><th></th></tr></thead><tbody>
+      ${projs.length ? `<div class="plist">
         ${projs.map(p => {
           const used = usedMinutes(p.id), over = p.soldMinutes && used > p.soldMinutes, has = db.entries.some(e => e.projectId === p.id);
-          if (editingProjectId === p.id) return `<tr><td colspan="6">
+          if (editingProjectId === p.id) return `<div class="pitem">
             <form class="edit-project grid" data-id="${p.id}" style="background:var(--soft);padding:12px;border-radius:8px">
               <div><label>Project name</label><input name="name" value="${esc(p.name)}" required></div>
               <div><label>Pre-sold time (empty = T&amp;M)</label><input name="sold" value="${p.soldMinutes ? fmt(p.soldMinutes) : ''}" placeholder="e.g. 80:00"></div>
               <div><label>Hourly rate override (€)</label><input name="rate" value="${p.rate ?? ''}" placeholder="${c.rate != null ? 'Client rate: ' + c.rate : 'e.g. 95'}" inputmode="decimal"></div>
               <div class="row" style="align-self:end"><button class="btn" type="submit">Save</button><button class="btn ghost" type="button" data-act="cancel-edit">Cancel</button></div>
-            </form></td></tr>`;
-          return `<tr><td>${esc(p.name)} ${p.archived ? '<span class="tag">archived</span>' : ''}</td>
-            <td class="num">${rateFor(p.id) == null ? '—' : money(rateFor(p.id)) + (p.rate != null ? ' <span class="tag">project</span>' : '')}</td>
-            <td class="num">${p.soldMinutes ? fmt(p.soldMinutes) : '<span class="muted">T&amp;M</span>'}</td>
-            <td class="num">${fmt(used)}${p.soldMinutes ? `<div class="progress ${over ? 'over' : ''}"><div style="width:${Math.min(100, used / p.soldMinutes * 100)}%"></div></div>` : ''}</td>
-            <td class="num ${over ? 'err' : ''}">${p.soldMinutes ? fmt(p.soldMinutes - used) : '—'}</td>
-            <td class="num"><div class="row" style="justify-content:flex-end">
+            </form></div>`;
+          const r = rateFor(p.id);
+          return `<div class="pitem">
+            <div class="pinfo">
+              <div><b>${esc(p.name)}</b> ${p.archived ? '<span class="tag">archived</span>' : ''}</div>
+              <div class="hint" style="margin:2px 0 0">${r == null ? '<span class="err">no rate</span>' : money(r) + ' / h' + (p.rate != null ? ' (project rate)' : '')} ·
+                ${p.soldMinutes ? `sold ${fmt(p.soldMinutes)} · used ${fmt(used)} · <span class="${over ? 'err' : ''}">${over ? 'over by ' + fmt(used - p.soldMinutes) : 'remaining ' + fmt(p.soldMinutes - used)}</span>` : `T&amp;M · ${fmt(used)} logged`}</div>
+              ${p.soldMinutes ? `<div class="progress ${over ? 'over' : ''}" style="max-width:360px"><div style="width:${Math.min(100, used / p.soldMinutes * 100)}%"></div></div>` : ''}
+            </div>
+            <div class="row pact">
               <button class="btn ghost small" data-act="edit-project" data-id="${p.id}">Edit</button>
               <button class="btn ghost small" data-act="archive-project" data-id="${p.id}">${p.archived ? 'Unarchive' : 'Archive'}</button>
               <button class="btn ghost small danger" data-act="del-project" data-id="${p.id}" ${has ? 'disabled title="This project has entries: archive it instead"' : ''}>Delete</button>
-            </div></td></tr>`;
-        }).join('')}</tbody></table>` : '<p class="muted" style="margin:0 0 8px">No projects.</p>'}
+            </div></div>`;
+        }).join('')}</div>` : '<p class="muted" style="margin:0 0 8px">No projects.</p>'}
       <form class="row add-project" data-client="${c.id}" style="margin-top:10px">
         <input name="name" placeholder="New project" style="flex:2;min-width:160px" required>
-        <input name="sold" placeholder="Pre-sold time (e.g. 20:00) — optional" style="flex:1;min-width:160px">
+        <input name="sold" placeholder="Pre-sold time (optional)" style="flex:1;min-width:160px">
         <button class="btn ghost" type="submit">Add project</button>
       </form>
     </div>`;
@@ -706,6 +753,165 @@ function addProject(clientId, name, soldRaw) {
   }
   const p = {id: uid(), clientId, name, soldMinutes: sold || null, rate: null, archived: false};
   mutate('upsert', 'projects', p); return p;
+}
+
+/* ---------- CSV import ---------- */
+let imp = null; // {rows:[{date,client,project,desc,minutes}], clientMap:{}, projMap:{}}
+
+function parseCSV(text) {
+  text = text.replace(/^﻿/, '');
+  const firstLine = text.split(/\r?\n/, 1)[0];
+  const delim = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+const normName = v => String(v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9]+/g, ' ').replace(/\b(s a|sa|nv|bv|bvba|srl|sprl|s r l|ltd|gmbh|ag|inc|cie)\b/g, ' ').replace(/\s+/g, ' ').trim();
+
+function parseImportDate(v) {
+  v = String(v || '').trim(); let m;
+  if ((m = v.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
+  if ((m = v.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$/))) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+  return null;
+}
+
+function guessClient(csvName) {
+  const n = normName(csvName);
+  const exact = db.clients.find(c => normName(c.name) === n);
+  if (exact) return exact.id;
+  const partial = db.clients.find(c => { const cn = normName(c.name); return cn && (n.startsWith(cn + ' ') || cn.startsWith(n + ' ')); });
+  return partial ? partial.id : 'new';
+}
+function guessProject(clientId, csvProject) {
+  if (clientId === 'new') return 'new';
+  const projs = db.projects.filter(p => p.clientId === clientId);
+  const n = normName(csvProject);
+  const exact = projs.find(p => normName(p.name) === n);
+  if (exact) return exact.id;
+  const active = projs.filter(p => !p.archived);
+  if (!n && active.length === 1) return active[0].id;
+  return 'new';
+}
+const pairKey = (client, project) => client + ' >> ' + project;
+
+async function loadImportFile(file) {
+  const rows = parseCSV(await file.text());
+  if (rows.length < 2) return toast('Empty CSV', true);
+  const h = rows[0].map(x => x.trim().toLowerCase());
+  const col = test => h.findIndex(test);
+  const ci = {
+    date: col(x => x.startsWith('date')),
+    client: col(x => /client|customer/.test(x)),
+    project: (() => { const e = h.indexOf('project'); return e >= 0 ? e : col(x => x.includes('project') && !x.includes('code')); })(),
+    desc: col(x => /note|description|task/.test(x)),
+    hours: col(x => /hour|heure|duration|time/.test(x))
+  };
+  if (ci.date < 0 || ci.client < 0 || ci.hours < 0) return toast('Columns Date, Client and Hours are required', true);
+  let bad = 0;
+  const data = rows.slice(1).map(r => {
+    const date = parseImportDate(r[ci.date]);
+    const hours = parseNum(r[ci.hours]);
+    const client = String(r[ci.client] || '').trim();
+    if (!date || !client || hours == null || Number.isNaN(hours) || hours <= 0) { bad++; return null; }
+    return {date, client, project: ci.project >= 0 ? String(r[ci.project] || '').trim() : '', desc: ci.desc >= 0 ? String(r[ci.desc] || '').trim() : '', minutes: Math.round(hours * 60)};
+  }).filter(Boolean);
+  imp = {rows: data, bad, clientMap: {}, projMap: {}};
+  [...new Set(data.map(r => r.client))].forEach(c => imp.clientMap[c] = guessClient(c));
+  renderImport();
+}
+
+function importRowsInRange() {
+  const from = $('#i-from').value || '0000-00-00', to = $('#i-to').value || '9999-12-31';
+  return imp.rows.filter(r => r.date >= from && r.date <= to);
+}
+
+function renderImport() {
+  const el = $('#i-preview');
+  if (!imp) { el.innerHTML = ''; return; }
+  const rows = importRowsInRange();
+  const clients = [...new Set(rows.map(r => r.client))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const pairs = {};
+  rows.forEach(r => { const k = pairKey(r.client, r.project); (pairs[k] ||= {client: r.client, project: r.project, n: 0, min: 0, last: ''}); pairs[k].n++; pairs[k].min += r.minutes; if (r.date > pairs[k].last) pairs[k].last = r.date; });
+  Object.values(pairs).forEach(pr => {
+    const k = pairKey(pr.client, pr.project), cid = imp.clientMap[pr.client];
+    const cur = imp.projMap[k];
+    const valid = cur === 'new' || (cur && getProject(cur)?.clientId === cid);
+    if (!valid) imp.projMap[k] = guessProject(cid, pr.project);
+  });
+  const dates = rows.map(r => r.date).sort();
+  const clientOpts = sel => `<option value="new"${sel === 'new' ? ' selected' : ''}>+ Create new client</option>` +
+    db.clients.slice().sort(byName).map(c => `<option value="${c.id}"${sel === c.id ? ' selected' : ''}>${esc(c.name)}${c.archived ? ' (archived)' : ''}</option>`).join('');
+  const projOpts = (cid, sel, csvProj) => `<option value="new"${sel === 'new' ? ' selected' : ''}>+ Create “${esc(csvProj || 'General')}”</option>` +
+    (cid === 'new' ? '' : db.projects.filter(p => p.clientId === cid).sort(byName).map(p => `<option value="${p.id}"${sel === p.id ? ' selected' : ''}>${esc(p.name)}${p.archived ? ' (archived)' : ''}</option>`).join(''));
+  el.innerHTML = `
+    <p><b>${rows.length}</b> entries${dates.length ? ` from ${dates[0]} to ${dates[dates.length - 1]}` : ''} · ${fmt(rows.reduce((a, r) => a + r.minutes, 0))} h${imp.bad ? ` · <span class="muted">${imp.bad} invalid rows ignored</span>` : ''}</p>
+    <h3 style="margin:14px 0 6px">1. Clients</h3>
+    <table><thead><tr><th>Client in CSV</th><th class="num">Entries</th><th>Import into</th></tr></thead><tbody>
+      ${clients.map(c => `<tr><td>${esc(c)}</td><td class="num">${rows.filter(r => r.client === c).length}</td><td><select class="i-cmap" data-csv="${esc(c)}">${clientOpts(imp.clientMap[c])}</select></td></tr>`).join('')}
+    </tbody></table>
+    <h3 style="margin:18px 0 6px">2. Projects</h3>
+    <table><thead><tr><th>Client · project in CSV</th><th class="num">Entries</th><th class="num">Hours</th><th>Last</th><th>Import into</th></tr></thead><tbody>
+      ${Object.entries(pairs).sort((a, b) => a[1].client.localeCompare(b[1].client, 'fr') || b[1].last.localeCompare(a[1].last)).map(([k, pr]) =>
+        `<tr><td>${esc(pr.client)} · <i>${esc(pr.project || '(no project)')}</i></td><td class="num">${pr.n}</td><td class="num">${fmt(pr.min)}</td><td>${pr.last}</td>
+         <td><select class="i-pmap" data-key="${esc(k)}">${projOpts(imp.clientMap[pr.client], imp.projMap[k], pr.project)}</select></td></tr>`).join('')}
+    </tbody></table>
+    <div class="row" style="margin-top:14px"><button class="btn" id="i-run" ${rows.length ? '' : 'disabled'}>Import ${rows.length} entries</button><button class="btn ghost" id="i-reset">Cancel</button></div>`;
+}
+
+async function runImport() {
+  const rows = importRowsInRange();
+  if (!rows.length) return;
+  if (!confirm(`Import ${rows.length} entries?`)) return;
+  const newClients = {}, newProjects = {}, created = {clients: [], projects: []};
+  const resolveClient = csv => {
+    const m = imp.clientMap[csv];
+    if (m !== 'new') return m;
+    if (!newClients[csv]) { const c = {id: uid(), name: csv, rate: null, vat: 21, archived: false}; newClients[csv] = c; db.clients.push(c); created.clients.push(c); }
+    return newClients[csv].id;
+  };
+  const resolveProject = (r, cid) => {
+    const k = pairKey(r.client, r.project), m = imp.projMap[k];
+    if (m !== 'new') return m;
+    if (!newProjects[k]) { const p = {id: uid(), clientId: cid, name: r.project || 'General', soldMinutes: null, rate: null, archived: false}; newProjects[k] = p; db.projects.push(p); created.projects.push(p); }
+    return newProjects[k].id;
+  };
+  const dedup = $('#i-dedup').checked;
+  const keyOf = e => [e.date, e.clientId, e.description.trim().toLowerCase(), e.minutes].join('|');
+  const existing = new Set(dedup ? db.entries.map(keyOf) : []);
+  let added = 0, skipped = 0;
+  rows.forEach((r, i) => {
+    const clientId = resolveClient(r.client), projectId = resolveProject(r, clientId);
+    const e = {id: uid() + i.toString(36), date: r.date, clientId, projectId, description: r.desc, minutes: r.minutes, createdAt: `${r.date}T12:00:00.${String(i % 1000).padStart(3, '0')}Z`};
+    if (dedup && existing.has(keyOf(e))) { skipped++; return; }
+    db.entries.push(e); added++;
+  });
+  if ($('#i-archive').checked) {
+    const d = new Date(); d.setFullYear(d.getFullYear() - 1); const limit = isoDate(d);
+    const last = id => db.entries.filter(e => e.projectId === id).reduce((a, e) => e.date > a ? e.date : a, '');
+    created.projects.forEach(p => { if (last(p.id) < limit) p.archived = true; });
+    created.clients.forEach(c => { if (!db.entries.some(e => e.clientId === c.id && e.date >= limit)) c.archived = true; });
+  }
+  persist();
+  if (cfg.mode === 'sheets') {
+    try { setSync('busy'); await flush(); await api({action: 'replaceAll', data: db}); queue = []; saveQueue(); setSync('ok'); }
+    catch (e) { setSync('error', e.message); return toast('Saved locally, but Sheet update failed: ' + e.message, true); }
+  }
+  imp = null; $('#i-file').value = ''; renderImport(); renderAll();
+  toast(`${added} entries imported${skipped ? `, ${skipped} duplicates skipped` : ''} · ${created.clients.length} clients, ${created.projects.length} projects created`);
 }
 
 /* ---------- Settings ---------- */
@@ -854,6 +1060,17 @@ function savePdf() {
 }
 
 $('#s-mode').onchange = toggleSheetsFields;
+$('#i-file').onchange = ev => { const f = ev.target.files[0]; if (f) loadImportFile(f); };
+['#i-from', '#i-to'].forEach(sel => $(sel).onchange = renderImport);
+$('#i-preview').addEventListener('change', ev => {
+  const c = ev.target.closest('.i-cmap'), pm = ev.target.closest('.i-pmap');
+  if (c) { imp.clientMap[c.dataset.csv] = c.value; renderImport(); }
+  if (pm) imp.projMap[pm.dataset.key] = pm.value;
+});
+$('#i-preview').addEventListener('click', ev => {
+  if (ev.target.id === 'i-run') runImport();
+  if (ev.target.id === 'i-reset') { imp = null; $('#i-file').value = ''; renderImport(); }
+});
 $('#s-save').onclick = async () => {
   const wasSheets = cfg.mode === 'sheets';
   cfg = {mode: $('#s-mode').value, url: $('#s-url').value.trim(), token: $('#s-token').value.trim()};
